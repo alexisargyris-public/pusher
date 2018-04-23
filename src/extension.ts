@@ -79,15 +79,20 @@ export function activate(context: vscode.ExtensionContext) {
 
   // import gql helper and craft a GraphQL query
   const gql = require('graphql-tag')
-  const query = gql(`
-  query {
-  getEvent(id: "dbe2478d-b57b-4099-b11c-196dd6bd7bc3") {
+  const mutation = gql(`
+  mutation {
+    createEvent(
+      name: "great opportunity", 
+      when: "01-01-1990", 
+      where: "bilski", 
+      description: "very nice event"
+    ){
       id
       description
       name
       when
       where
-  }
+    }
   }`)
 
   // set up the Apollo client
@@ -97,15 +102,16 @@ export function activate(context: vscode.ExtensionContext) {
     auth: {
       type: type,
       credentials: credentials
-    }
+    },
+    disableOffline: true
   })
 
   client.hydrated().then(client => {
-    // run a query
+    // do the mutation
     client
-      .query({ query: query })
-      .then(data => {
-        console.log(data)
+      .mutate({ mutation: mutation })
+      .then(payload => {
+        console.log(payload.data.createEvent)
       })
       .catch(error => {
         console.error(error)
