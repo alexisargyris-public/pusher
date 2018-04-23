@@ -1,0 +1,49 @@
+{
+  "name": "pusher",
+  "displayName": "pusher",
+  "description":
+    "vscode extension to push update events of the active document to a remote server",
+  "version": "0.0.1",
+  "publisher": "anemomazomata",
+  "engines": {
+    "vscode": "^1.22.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onCommand:extension.pusher"],
+  "main": "./out/extension",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.pusher",
+        "title": "pusher"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "test": "npm run compile && node ./node_modules/vscode/bin/test"
+  },
+  "devDependencies": {
+    "typescript": "^2.6.1",
+    "vscode": "^1.1.6",
+    "tslint": "^5.8.0",
+    "@types/node": "^7.0.43",
+    "@types/mocha": "^2.2.42"
+  },
+  "dependencies": {
+    "apollo-cache-inmemory": "^1.1.0",
+    "apollo-client": "^2.0.3",
+    "apollo-link": "^1.0.3",
+    "apollo-link-http": "^1.2.0",
+    "aws-sdk": "^2.141.0",
+    "aws-appsync": "^1.0.0",
+    "es6-promise": "^4.1.1",
+    "graphql": "^0.11.7",
+    "graphql-tag": "^2.5.0",
+    "isomorphic-fetch": "^2.2.1",
+    "ws": "^3.3.1"
+  }
+}
