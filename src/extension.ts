@@ -26,6 +26,23 @@ export function activate(context: vscode.ExtensionContext) {
         ev.document === vscode.window.activeTextEditor.document
       ) {
         console.log(ev.contentChanges[0].text)
+        const mutation = gql(`
+        mutation {
+          createEvent(
+            datetime: "${Date.now()}",
+            content: "${ev.contentChanges[0].text}",
+            filename: "filename",
+            user: "user",
+            device: "device",
+            editor: "editor",
+            sitting: "sitting"
+          ){
+            id
+          }
+        }`)
+        client.mutate({ mutation: mutation }).catch(error => {
+          console.error(error)
+        })
       }
     }
   )
@@ -76,26 +93,7 @@ export function activate(context: vscode.ExtensionContext) {
     })
   })
   const credentials = AWS.config.credentials
-
-  // import gql helper and craft a GraphQL query
   const gql = require('graphql-tag')
-  const mutation = gql(`
-  mutation {
-    createEvent(
-      name: "great opportunity", 
-      when: "01-01-1990", 
-      where: "bilski", 
-      description: "very nice event"
-    ){
-      id
-      description
-      name
-      when
-      where
-    }
-  }`)
-
-  // set up the Apollo client
   const client = new AWSAppSyncClient({
     url: url,
     region: region,
@@ -104,18 +102,6 @@ export function activate(context: vscode.ExtensionContext) {
       credentials: credentials
     },
     disableOffline: true
-  })
-
-  client.hydrated().then(client => {
-    // do the mutation
-    client
-      .mutate({ mutation: mutation })
-      .then(payload => {
-        console.log(payload.data.createEvent)
-      })
-      .catch(error => {
-        console.error(error)
-      })
   })
 }
 
