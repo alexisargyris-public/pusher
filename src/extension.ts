@@ -8,52 +8,90 @@ import Config from './aws-exports'
  * @param context
  */
 export function activate(context: vscode.ExtensionContext) {
-  console.log('pusher activated')
   // exit immediately if no document is open
-  if (!vscode.workspace.textDocuments.length) {
-    return
+  if (typeof vscode.window.activeTextEditor === 'undefined') {
+    return // FIX return something that will allow successful activation after an editor is opened
   }
 
-  // TODO note which editor currently has focus
+  console.log('pusher activated')
 
-  // the change event handler
+  // status bar item
+  let statusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right
+  )
+  statusBarItem.text = 'pusher'
+  statusBarItem.show()
+  // name of file to watch
+  const watchedFilename = vscode.window.activeTextEditor.document.fileName
+  // current session id
+  let sessionId: String = ''
+
+  // TODO reset when user renames file
+
+  // change editor event handler
+  vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
+    // update status bar
+    if (watchedFilename === event.document.fileName) {
+      statusBarItem.show()
+    } else {
+      statusBarItem.hide()
+    }
+  })
+
+  // change text event handler
   vscode.workspace.onDidChangeTextDocument(
-    (ev: vscode.TextDocumentChangeEvent) => {
-      // TODO ignore change events of different editors
-
-      if (
-        vscode.window.activeTextEditor &&
-        ev.document === vscode.window.activeTextEditor.document
-      ) {
-        console.log(ev.contentChanges[0].text)
-        const mutation = gql(`
-        mutation {
-          createEvent(
-            datetime: "${Date.now()}",
-            content: "${ev.contentChanges[0].text}",
-            filename: "filename",
-            user: "user",
-            device: "device",
-            editor: "editor",
-            sitting: "sitting"
-          ){
-            id
-          }
-        }`)
-        client.mutate({ mutation: mutation }).catch(error => {
-          console.error(error)
-        })
+    (event: vscode.TextDocumentChangeEvent) => {
+      let mutation
+      // process only events happening to filename being watched
+      if (watchedFilename === event.document.fileName) {
+        // TODO handle multiple / complex content changes
+        if (event.contentChanges.length > 1) {
+          vscode.window.showInformationMessage('a complex edit occured')
+        }
+        if (sessionId === '') {
+          // first session event
+          mutation = gql(`
+          mutation {
+            createEvent(
+              content: "${event.contentChanges[0].text}",
+              filename: "${watchedFilename}"
+            ){
+              sessionId
+            }
+          }`)
+        } else {
+          // not first session event
+          mutation = gql(`
+          mutation {
+            createEvent(
+              sessionId: "${sessionId}",
+              content: "${event.contentChanges[0].text}",
+              filename: "${watchedFilename}"
+            ){
+              sessionId
+            }
+          }`)
+        }
+        console.log(sessionId)
+        client
+          .mutate({ mutation: mutation })
+          .then(result => {
+            if (sessionId === '') {
+              sessionId = result.data.createEvent.sessionId
+            }
+          })
+          .catch(error => {
+            console.error(error)
+          })
       }
     }
   )
 
-  // the command associated with the extension
-  let disposable = vscode.commands.registerCommand('extension.pusher', () => {
-    // execute every time the command is executed
-  })
+  // command associated with extension
+  let disposable = vscode.commands.registerCommand('extension.pusher', () => {})
   context.subscriptions.push(disposable)
 
-  // the appsync client
+  // appsync client
   const config = new Config()
   global.WebSocket = require('ws')
   global.window = global.window || {
@@ -105,4 +143,7 @@ export function activate(context: vscode.ExtensionContext) {
   })
 }
 
+/**
+ * This is called by vscode when the extension needs to be deactivated
+ */
 export function deactivate() {}
