@@ -8,35 +8,68 @@ import Config from './aws-exports'
  * @param context
  */
 export function activate(context: vscode.ExtensionContext) {
-  console.log('pusher activated')
   // exit immediately if no document is open
-  if (!vscode.workspace.textDocuments.length) {
+  if (typeof vscode.window.activeTextEditor === 'undefined') {
+    // no editor is open
+    // FIXME: return something that will allow successful activation after an editor is opened
     return
   }
 
-  // TODO note which editor currently has focus
+  console.log('pusher activated')
 
-  // the change event handler
+  // status bar item
+  let statusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right
+  )
+  statusBarItem.text = 'pusher'
+  statusBarItem.show()
+  // name of file to watch
+  const watchedFilename = vscode.window.activeTextEditor.document.fileName
+  // current session id
+  let sessionId: String
+
+  // TODO: reset when user renames file
+
+  // change editor event handler
+  vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
+    // update status bar
+    if (watchedFilename === event.document.fileName) statusBarItem.show()
+    else statusBarItem.hide()
+  })
+
+  // change text event handler
   vscode.workspace.onDidChangeTextDocument(
-    (ev: vscode.TextDocumentChangeEvent) => {
-      // TODO ignore change events of different editors
-
-      if (
-        vscode.window.activeTextEditor &&
-        ev.document === vscode.window.activeTextEditor.document
-      ) {
-        console.log(ev.contentChanges[0].text)
+    (event: vscode.TextDocumentChangeEvent) => {
+      let mutation
+      // process only events happening to filename being watched
+      if (watchedFilename === event.document.fileName) {
+        // TODO: handle multiple / complex content changes
+        if (event.contentChanges.length > 1)
+          vscode.window.showWarningMessage('a complex edit occured')
+        if (typeof sessionId === 'undefined') sessionId = Date.now().toString()
+        mutation = gql(`
+        mutation {
+          createEvent(
+            sessionId: "${sessionId}",
+            eventId: "${Date.now().toString()}"
+            content: "${event.contentChanges[0].text}",
+            filename: "${watchedFilename}"
+          ){
+            sessionId
+          }
+        }`)
+        client.mutate({ mutation: mutation }).catch(error => {
+          vscode.window.showErrorMessage('an error occured: ' + error.message)
+        })
       }
     }
   )
 
-  // the command associated with the extension
-  let disposable = vscode.commands.registerCommand('extension.pusher', () => {
-    // execute every time the command is executed
-  })
+  // command associated with extension
+  let disposable = vscode.commands.registerCommand('extension.pusher', () => {})
   context.subscriptions.push(disposable)
 
-  // the appsync client
+  // appsync client
   const config = new Config()
   global.WebSocket = require('ws')
   global.window = global.window || {
@@ -76,26 +109,7 @@ export function activate(context: vscode.ExtensionContext) {
     })
   })
   const credentials = AWS.config.credentials
-
-  // import gql helper and craft a GraphQL query
   const gql = require('graphql-tag')
-  const mutation = gql(`
-  mutation {
-    createEvent(
-      name: "great opportunity", 
-      when: "01-01-1990", 
-      where: "bilski", 
-      description: "very nice event"
-    ){
-      id
-      description
-      name
-      when
-      where
-    }
-  }`)
-
-  // set up the Apollo client
   const client = new AWSAppSyncClient({
     url: url,
     region: region,
@@ -105,18 +119,9 @@ export function activate(context: vscode.ExtensionContext) {
     },
     disableOffline: true
   })
-
-  client.hydrated().then(client => {
-    // do the mutation
-    client
-      .mutate({ mutation: mutation })
-      .then(payload => {
-        console.log(payload.data.createEvent)
-      })
-      .catch(error => {
-        console.error(error)
-      })
-  })
 }
 
+/**
+ * This is called by vscode when the extension needs to be deactivated
+ */
 export function deactivate() {}
