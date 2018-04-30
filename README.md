@@ -13,3 +13,5 @@ A vscode extension to push update events of the active document to a remote serv
 ## Release Notes
 
 ### 0.1.0
+
+* proof of concept
