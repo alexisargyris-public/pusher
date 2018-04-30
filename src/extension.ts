@@ -10,7 +10,9 @@ import Config from './aws-exports'
 export function activate(context: vscode.ExtensionContext) {
   // exit immediately if no document is open
   if (typeof vscode.window.activeTextEditor === 'undefined') {
-    return // FIX return something that will allow successful activation after an editor is opened
+    // no editor is open
+    // FIXME: return something that will allow successful activation after an editor is opened
+    return
   }
 
   console.log('pusher activated')
@@ -24,18 +26,15 @@ export function activate(context: vscode.ExtensionContext) {
   // name of file to watch
   const watchedFilename = vscode.window.activeTextEditor.document.fileName
   // current session id
-  let sessionId: String = ''
+  let sessionId: String
 
-  // TODO reset when user renames file
+  // TODO: reset when user renames file
 
   // change editor event handler
   vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
     // update status bar
-    if (watchedFilename === event.document.fileName) {
-      statusBarItem.show()
-    } else {
-      statusBarItem.hide()
-    }
+    if (watchedFilename === event.document.fileName) statusBarItem.show()
+    else statusBarItem.hide()
   })
 
   // change text event handler
@@ -44,45 +43,24 @@ export function activate(context: vscode.ExtensionContext) {
       let mutation
       // process only events happening to filename being watched
       if (watchedFilename === event.document.fileName) {
-        // TODO handle multiple / complex content changes
-        if (event.contentChanges.length > 1) {
-          vscode.window.showInformationMessage('a complex edit occured')
-        }
-        if (sessionId === '') {
-          // first session event
-          mutation = gql(`
-          mutation {
-            createEvent(
-              content: "${event.contentChanges[0].text}",
-              filename: "${watchedFilename}"
-            ){
-              sessionId
-            }
-          }`)
-        } else {
-          // not first session event
-          mutation = gql(`
-          mutation {
-            createEvent(
-              sessionId: "${sessionId}",
-              content: "${event.contentChanges[0].text}",
-              filename: "${watchedFilename}"
-            ){
-              sessionId
-            }
-          }`)
-        }
-        console.log(sessionId)
-        client
-          .mutate({ mutation: mutation })
-          .then(result => {
-            if (sessionId === '') {
-              sessionId = result.data.createEvent.sessionId
-            }
-          })
-          .catch(error => {
-            console.error(error)
-          })
+        // TODO: handle multiple / complex content changes
+        if (event.contentChanges.length > 1)
+          vscode.window.showWarningMessage('a complex edit occured')
+        if (typeof sessionId === 'undefined') sessionId = Date.now().toString()
+        mutation = gql(`
+        mutation {
+          createEvent(
+            sessionId: "${sessionId}",
+            eventId: "${Date.now().toString()}"
+            content: "${event.contentChanges[0].text}",
+            filename: "${watchedFilename}"
+          ){
+            sessionId
+          }
+        }`)
+        client.mutate({ mutation: mutation }).catch(error => {
+          vscode.window.showErrorMessage('an error occured: ' + error.message)
+        })
       }
     }
   )
