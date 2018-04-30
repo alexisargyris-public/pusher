@@ -3,7 +3,7 @@
   "displayName": "pusher",
   "description":
     "vscode extension to push update events of the active document to a remote server",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "anemomazomata",
   "engines": {
     "vscode": "^1.22.0"
