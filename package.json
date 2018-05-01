@@ -5,6 +5,10 @@
     "vscode extension to push update events of the active document to a remote server",
   "version": "0.1.0",
   "publisher": "anemomazomata",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anemomazomata/pusher.git"
+  },
   "engines": {
     "vscode": "^1.22.0"
   },
@@ -45,5 +49,6 @@
     "graphql-tag": "^2.5.0",
     "isomorphic-fetch": "^2.2.1",
     "ws": "^3.3.1"
-  }
+  },
+  "license": "MIT"
 }

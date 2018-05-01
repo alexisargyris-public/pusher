@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // TODO: reset when user renames file
 
-  // change editor event handler
+  // change active editor event handler
   vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
     // update status bar
     if (watchedFilename === event.document.fileName) statusBarItem.show()
