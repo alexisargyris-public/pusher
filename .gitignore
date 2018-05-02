@@ -4,3 +4,4 @@ node_modules
 *.vsix
 aws-exports.ts
 npm-debug.log
+yarn.lock

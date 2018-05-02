@@ -1,8 +1,7 @@
 {
   "name": "pusher",
   "displayName": "pusher",
-  "description":
-    "vscode extension to push update events of the active document to a remote server",
+  "description": "vscode extension to push update events of the active document to a remote server",
   "version": "0.1.0",
   "publisher": "anemomazomata",
   "repository": {
@@ -12,8 +11,12 @@
   "engines": {
     "vscode": "^1.22.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onCommand:extension.pusher"],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:extension.pusher"
+  ],
   "main": "./out/extension",
   "contributes": {
     "commands": [
@@ -31,19 +34,21 @@
     "test": "npm run compile && node ./node_modules/vscode/bin/test"
   },
   "devDependencies": {
-    "typescript": "^2.6.1",
-    "vscode": "^1.1.6",
-    "tslint": "^5.8.0",
+    "@types/mocha": "^2.2.42",
     "@types/node": "^7.0.43",
-    "@types/mocha": "^2.2.42"
+    "eslint-config-prettier": "^2.9.0",
+    "eslint-plugin-prettier": "^2.6.0",
+    "tslint": "^5.8.0",
+    "typescript": "^2.6.1",
+    "vscode": "^1.1.6"
   },
   "dependencies": {
     "apollo-cache-inmemory": "^1.1.0",
     "apollo-client": "^2.0.3",
     "apollo-link": "^1.0.3",
     "apollo-link-http": "^1.2.0",
-    "aws-sdk": "^2.141.0",
     "aws-appsync": "^1.0.0",
+    "aws-sdk": "^2.141.0",
     "es6-promise": "^4.1.1",
     "graphql": "^0.11.7",
     "graphql-tag": "^2.5.0",

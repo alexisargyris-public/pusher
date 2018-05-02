@@ -9,11 +9,10 @@ import Config from './aws-exports'
  */
 export function activate(context: vscode.ExtensionContext) {
   // exit immediately if no document is open
-  if (typeof vscode.window.activeTextEditor === 'undefined') {
+  if (typeof vscode.window.activeTextEditor === 'undefined')
     // no editor is open
     // FIXME: return something that will allow successful activation after an editor is opened
     return
-  }
 
   console.log('pusher activated')
 
@@ -24,7 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
   statusBarItem.text = 'pusher'
   statusBarItem.show()
   // name of file to watch
-  const watchedFilename = vscode.window.activeTextEditor.document.fileName
+  const filename = vscode.window.activeTextEditor.document.fileName
   // current session id
   let sessionId: String
 
@@ -33,27 +32,38 @@ export function activate(context: vscode.ExtensionContext) {
   // change active editor event handler
   vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
     // update status bar
-    if (watchedFilename === event.document.fileName) statusBarItem.show()
+    if (filename === event.document.fileName) statusBarItem.show()
     else statusBarItem.hide()
   })
 
   // change text event handler
   vscode.workspace.onDidChangeTextDocument(
     (event: vscode.TextDocumentChangeEvent) => {
-      let mutation
+      let mutation: any
+      let content: String
+      let eventId: String
+
       // process only events happening to filename being watched
-      if (watchedFilename === event.document.fileName) {
+      if (filename === event.document.fileName) {
+        if (typeof sessionId === 'undefined') sessionId = Date.now().toString()
+
         // TODO: handle multiple / complex content changes
         if (event.contentChanges.length > 1)
           vscode.window.showWarningMessage('a complex edit occured')
-        if (typeof sessionId === 'undefined') sessionId = Date.now().toString()
+
+        // double stringify to escape all double quotes...
+        content = JSON.stringify(event.contentChanges[0])
+        content = JSON.stringify(content)
+        // ...but remove outer double quotes
+        content = content.substring(1, content.length - 1)
+        eventId = Date.now().toString()
         mutation = gql(`
         mutation {
           createEvent(
             sessionId: "${sessionId}",
-            eventId: "${Date.now().toString()}"
-            content: "${event.contentChanges[0].text}",
-            filename: "${watchedFilename}"
+            eventId: "${eventId}",
+            content: "${content}",
+            filename: "${filename}"
           ){
             sessionId
           }
