@@ -16,6 +16,8 @@ export default class Database {
         content: "${content}"
       }){
         eventId
+        content
+        sessionId
       }
     }`
     return this.gr.mutate(mutation).then(res => {
