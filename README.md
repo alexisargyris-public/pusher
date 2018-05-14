@@ -12,12 +12,18 @@ A vscode extension to push update events of the active document to a remote serv
 
 ## Release Notes
 
-### 0.1.0
+### 0.3.0
 
-* proof of concept
+* event counter at the status bar
+* timeoutLimit to 1 sec
+* check for events with 0 content changes
 
 ### 0.2.0
 
 * db functions refactoring
 * new db schema, queries and mutations
 * event queue
+
+### 0.1.0
+
+* proof of concept
