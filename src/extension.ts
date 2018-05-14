@@ -3,7 +3,7 @@
 import * as vscode from 'vscode'
 import Database from './db'
 
-let timeoutLimit = 500
+let timeoutLimit = 1000
 let timeout = null
 
 /**
@@ -46,6 +46,10 @@ export function activate(context: vscode.ExtensionContext) {
     }
     let content: String
 
+    // update status
+    statusBarItem.text = 'pusher: ' + eventQueue.length
+    statusBarItem.show()
+  
     // check if not already processing and that there is an event to process
     if (!isProcessing && eventQueue.length > 0) {
       isProcessing = true
@@ -78,8 +82,6 @@ export function activate(context: vscode.ExtensionContext) {
   let statusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right
   )
-  statusBarItem.text = 'pusher'
-  statusBarItem.show()
 
   const db = new Database()
   let fileId: String
@@ -105,7 +107,7 @@ export function activate(context: vscode.ExtensionContext) {
     (event: vscode.TextDocumentChangeEvent) => {
       // process the event only if it occured to the document being watched
       // TODO: compare with event.document, not event.document.fileName to ensure that no file renaming, etc
-      if (path === event.document.fileName) eventQueue.push(event)
+      if (event.contentChanges.length && path === event.document.fileName) eventQueue.push(event)
     }
   )
 
