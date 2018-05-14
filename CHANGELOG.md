@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.3.1] - 2018-05-14
+
+### Fixed
+
+* createEvent should publish all data
+
 ## [0.3.0] - 2018-05-14
 
 ### Added

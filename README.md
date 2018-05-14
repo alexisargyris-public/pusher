@@ -12,6 +12,10 @@ A vscode extension to push update events of the active document to a remote serv
 
 ## Release Notes
 
+### 0.3.1
+
+* createEvent should publish all data
+
 ### 0.3.0
 
 * event counter at the status bar
