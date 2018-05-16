@@ -9,9 +9,11 @@ export default class Database {
     this.gr = new Mygraphql()
   }
   public createEvent(sessionId: String, content: String) {
+    let timestamp = Date.now()
     let mutation = `
     mutation {
       createEvent(input: {
+        eventId: "${timestamp}"
         sessionId: "${sessionId}",
         content: "${content}"
       }){
@@ -25,9 +27,11 @@ export default class Database {
     })
   }
   public createSession(fileId: String) {
+    let timestamp = Date.now()
     let mutation = `
     mutation {
       createSession(input: {
+        sessionId: "${timestamp}"
         fileId: "${fileId}"
       }){
         sessionId
@@ -39,9 +43,11 @@ export default class Database {
     })
   }
   public createFile(path: String) {
+    let timestamp = Date.now()
     let mutation = `
     mutation {
       createFile(input: {
+        fileId: "${timestamp}"
         path: "${path}"
       }){
         fileId
