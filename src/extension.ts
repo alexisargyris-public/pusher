@@ -11,8 +11,8 @@ let timeout = null
  * @param context
  */
 export function activate(context: vscode.ExtensionContext) {
-  function processEvent() {
-    function findFileId(path) {
+  function eventLoop() {
+    function createOrFindFileId(path) {
       if (typeof fileId === 'undefined') {
         return db.findFileId(path).then(id => {
           fileId = id
@@ -30,8 +30,10 @@ export function activate(context: vscode.ExtensionContext) {
         return Promise.resolve()
       }
     }
-    function handleEvent(event) {
+    function createEvent(event) {
       // TODO: handle multiple / complex content changes
+      let content: String
+
       if (event.contentChanges.length > 1)
         vscode.window.showWarningMessage('a complex edit occured')
 
@@ -40,26 +42,26 @@ export function activate(context: vscode.ExtensionContext) {
       content = JSON.stringify(content)
       // ...but remove outer double quotes
       content = content.substring(1, content.length - 1)
-      return db.createEvent(sessionId, content).catch(error => {
-        vscode.window.showErrorMessage('an error occured: ' + error.message)
-      })
+      return db.createEvent(sessionId, content)
     }
-    let content: String
-
-    // update status
-    statusBarItem.text = 'pusher: ' + eventQueue.length
-    statusBarItem.show()
-  
-    // check if not already processing and that there is an event to process
-    if (!isProcessing && eventQueue.length > 0) {
-      isProcessing = true
-      findFileId(path)
+    function processOneEvent(event) {
+      return createOrFindFileId(path)
         .then(() => {
           return createSession(fileId)
         })
         .then(() => {
-          return handleEvent(eventQueue[0])
+          return createEvent(eventQueue[0])
         })
+    }
+
+    // update status
+    statusBarItem.text = 'pusher: ' + eventQueue.length
+    statusBarItem.show()
+
+    // check if not already processing and that there is an event to process
+    if (!isProcessing && eventQueue.length > 0) {
+      isProcessing = true
+      processOneEvent(eventQueue[0])
         .then(() => {
           isProcessing = false
           eventQueue.shift()
@@ -70,6 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
         })
     }
   }
+
   // exit immediately if no document is open
   if (typeof vscode.window.activeTextEditor === 'undefined')
     // no editor is open
@@ -91,7 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
   let sessionId: String
   let eventQueue: any[] = []
   let isProcessing: Boolean = false
-  timeout = setInterval(processEvent, timeoutLimit)
+  timeout = setInterval(eventLoop, timeoutLimit)
 
   // TODO: reset when user renames file
 
@@ -107,7 +110,8 @@ export function activate(context: vscode.ExtensionContext) {
     (event: vscode.TextDocumentChangeEvent) => {
       // process the event only if it occured to the document being watched
       // TODO: compare with event.document, not event.document.fileName to ensure that no file renaming, etc
-      if (event.contentChanges.length && path === event.document.fileName) eventQueue.push(event)
+      if (event.contentChanges.length && path === event.document.fileName)
+        eventQueue.push(event)
     }
   )
 
