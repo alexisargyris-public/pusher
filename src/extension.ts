@@ -11,6 +11,18 @@ let timeout = null
  * @param context
  */
 export function activate(context: vscode.ExtensionContext) {
+  function createFirstEvent(doc) {
+    return {
+      contentChanges: [
+        {
+          range: new vscode.Range(0, 0, 0, 0),
+          rangeLength: 0,
+          rangeOffset: 0,
+          text: doc.getText()
+        }
+      ]
+    }
+  }
   function eventLoop() {
     function createOrFindFileId(path) {
       if (typeof fileId === 'undefined') {
@@ -94,6 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
   let sessionId: String
   let eventQueue: any[] = []
   let isProcessing: Boolean = false
+  let isFirstEvent: Boolean = true
   timeout = setInterval(eventLoop, timeoutLimit)
 
   // TODO: reset when user renames file
@@ -109,9 +122,14 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.workspace.onDidChangeTextDocument(
     (event: vscode.TextDocumentChangeEvent) => {
       // process the event only if it occured to the document being watched
-      // TODO: compare with event.document, not event.document.fileName to ensure that no file renaming, etc
-      if (event.contentChanges.length && path === event.document.fileName)
-        eventQueue.push(event)
+      if (event.contentChanges.length && path === event.document.fileName) {
+        if (isFirstEvent) {
+          isFirstEvent = false
+          eventQueue.push(createFirstEvent(event.document))
+        } else {
+          eventQueue.push(event)
+        }
+      }
     }
   )
 
