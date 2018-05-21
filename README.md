@@ -12,6 +12,10 @@ A vscode extension to push update events of the active document to a remote serv
 
 ## Release Notes
 
+### 1.0.1
+
+* the first event to be pushed is the whole file contents
+
 ### 1.0.0
 
 * client timestamps for files, sessions and events

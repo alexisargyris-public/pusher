@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.0.1] - 2018-05-21
+
+### Fixed
+
+* the first event to be pushed is the whole file contents
+
 ## [1.0.0] - 2018-05-16
 
 ## Added
