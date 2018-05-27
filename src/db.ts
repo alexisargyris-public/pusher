@@ -56,7 +56,13 @@ export default class Database {
       return res.data.createFile.fileId
     })
   }
-  public listFilesByPath(path: String) {
+  public findFile(path: String) {
+    // find a file and return its id or false
+    return this.listFilesByPath(path).then(items => {
+      return items.length >= 1 ? items[0].fileId : false
+    })
+  }
+  private listFilesByPath(path: String) {
     let qr = `
     query {
       listFilesByPath(path: "${path}") {
@@ -68,20 +74,6 @@ export default class Database {
     `
     return this.gr.query(qr).then(res => {
       return res.data.listFilesByPath.items
-    })
-  }
-  public findFileId(path: String) {
-    // find a file and return its id or create a new one
-    return this.listFilesByPath(path).then(items => {
-      if (items.length >= 1) {
-        // file found; return its fileId
-        return items[0].fileId
-      } else {
-        // file not found; create a new file entry and return its id
-        return this.createFile(path).then(fileId => {
-          return fileId
-        })
-      }
     })
   }
 }

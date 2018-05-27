@@ -24,27 +24,57 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
   function eventLoop() {
-    function createOrFindFileId(path) {
-      if (typeof fileId === 'undefined') {
-        return db.findFileId(path).then(id => {
-          fileId = id
-        })
-      } else {
-        return Promise.resolve()
-      }
+    function findOrCreateFile() {
+      // set fileId if it doesn't already exist
+      return new Promise((resolve, reject) => {
+        if (typeof fileId === 'undefined') {
+          // fileId is not set; check if the file exists in the db
+          return db.findFile(path).then(id => {
+            if (id) {
+              // the file exists
+              fileId = id
+              resolve()
+            } else {
+              // the file does not exist; create it
+              return db.createFile(path).then(id => {
+                if (id) {
+                  fileId = id
+                  resolve()
+                } else {
+                  reject('fileId creation failed')
+                }
+              })
+            }
+          })
+        } else {
+          // fileId is already set
+          resolve()
+        }
+      })
     }
-    function createSession(fileId) {
-      if (typeof sessionId === 'undefined') {
-        return db.createSession(fileId).then(id => {
-          sessionId = id
-        })
-      } else {
-        return Promise.resolve()
-      }
+    function findOrCreateSession() {
+      // set sessionId if it doesn't already exist
+      return new Promise((resolve, reject) => {
+        if (typeof sessionId === 'undefined') {
+          // sessionId is not set; this is a new session, create it
+          return db.createSession(fileId).then(id => {
+            if (id) {
+              sessionId = id
+              resolve()
+            } else {
+              reject('sessionId creation failed')
+            }
+          })
+        } else {
+          // sessionId is already set
+          resolve()
+        }
+      })
     }
-    function createEvent(event) {
+    function createEvent() {
       // TODO: handle multiple / complex content changes
       let content: String
+      let event = eventQueue[0]
 
       if (event.contentChanges.length > 1)
         vscode.window.showWarningMessage('a complex edit occured')
@@ -54,15 +84,19 @@ export function activate(context: vscode.ExtensionContext) {
       content = JSON.stringify(content)
       // ...but remove outer double quotes
       content = content.substring(1, content.length - 1)
-      return db.createEvent(sessionId, content)
+      return db.createEvent(sessionId, content).then(id => {
+        if (!id) {
+          return Promise.reject('eventId creation failed')
+        }
+      })
     }
-    function processOneEvent(event) {
-      return createOrFindFileId(path)
+    function processOneEvent() {
+      return findOrCreateFile()
         .then(() => {
-          return createSession(fileId)
+          return findOrCreateSession()
         })
         .then(() => {
-          return createEvent(eventQueue[0])
+          return createEvent()
         })
     }
 
@@ -73,14 +107,14 @@ export function activate(context: vscode.ExtensionContext) {
     // check if not already processing and that there is an event to process
     if (!isProcessing && eventQueue.length > 0) {
       isProcessing = true
-      processOneEvent(eventQueue[0])
+      processOneEvent()
         .then(() => {
           isProcessing = false
           eventQueue.shift()
         })
         .catch(error => {
           isProcessing = false
-          vscode.window.showErrorMessage('an error occured: ' + error.message)
+          vscode.window.showErrorMessage('an error occured: ' + error)
         })
     }
   }
@@ -99,10 +133,9 @@ export function activate(context: vscode.ExtensionContext) {
   )
 
   const db = new Database()
-  let fileId: String
   // path of file to watch
   const path = vscode.window.activeTextEditor.document.fileName
-  // current session id
+  let fileId: String
   let sessionId: String
   let eventQueue: any[] = []
   let isProcessing: Boolean = false
