@@ -5,7 +5,12 @@ All notable changes to the "pusher" extension will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.2] - 2018-05-27
+
+### Fixed
+
+* return only the id when creating an event
+* check if the file / session / event were created successfully
 
 ## [1.0.1] - 2018-05-21
 
