@@ -42,10 +42,12 @@ export default class Database {
   }
   public createFile(path: String) {
     let timestamp = Date.now()
+    let bookId = 'amomonaima' // FIXME: read the list of available bookIds
     let mutation = `
     mutation {
       createFile(input: {
         fileId: "${timestamp}"
+        bookId: "${bookId}"
         path: "${path}"
       }){
         fileId
