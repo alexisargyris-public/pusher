@@ -1,4 +1,4 @@
-# pusher README
+# pusher
 
 A vscode extension to push update events of the active document to a remote server.
 
@@ -11,6 +11,10 @@ A vscode extension to push update events of the active document to a remote serv
 ## Known Issues
 
 ## Release Notes
+
+### 1.1.0
+
+* start using books
 
 ### 1.0.2
 
