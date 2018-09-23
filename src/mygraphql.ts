@@ -9,16 +9,17 @@ export default class Mygraphql {
   constructor() {
     // appsync client
     const config = new Config()
-    global.WebSocket = require('ws')
-    global.window = global.window || {
+    ;(global as any).WebSocket = require('ws')(
+      global as any
+    ).window = (global as any).window || {
       setTimeout: setTimeout,
       clearTimeout: clearTimeout,
-      WebSocket: global.WebSocket,
+      WebSocket: (global as any).WebSocket,
       ArrayBuffer: global.ArrayBuffer,
       addEventListener: function() {},
       navigator: { onLine: true }
     }
-    global.localStorage = {
+    ;(global as any).localStorage = {
       store: {},
       getItem: function(key) {
         return this.store[key]
