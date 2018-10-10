@@ -11,7 +11,7 @@ export default class Database {
   public createEvent(sessionId: String, content: String) {
     let timestamp = Date.now()
     let mutation = `
-    mutation {
+    mutation ce{
       createEvent(input: {
         eventId: "${timestamp}"
         sessionId: "${sessionId}",
@@ -44,11 +44,11 @@ export default class Database {
     let timestamp = Date.now()
     let bookId = 'amomonaima' // FIXME: read the list of available bookIds
     let mutation = `
-    mutation {
+    mutation cf{
       createFile(input: {
         fileId: "${timestamp}"
         bookId: "${bookId}"
-        path: "${path}"
+        path: "${this.preparePath(path)}"
       }){
         fileId
       }
@@ -65,9 +65,9 @@ export default class Database {
     })
   }
   private listFilesByPath(path: String) {
-    let qr = `
-    query {
-      listFilesByPath(path: "${path}") {
+    const qr = `
+    query lfbp{
+      listFilesByPath(path: "${this.preparePath(path)}") {
         items {
           fileId
         }
@@ -77,5 +77,15 @@ export default class Database {
     return this.gr.query(qr).then(res => {
       return res.data.listFilesByPath.items
     })
+  }
+  private preparePath(path: String) {
+    // ref: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace
+    const regex = /\\"/gi
+    let temp = JSON.stringify(JSON.stringify(path)) // double escape backslashes
+    let temp2 = temp.replace(regex, '') // remove \"
+    let temp3 = temp2.substring(1, temp2.length - 1)
+    console.log(path)
+    console.log(temp3)
+    return temp3
   }
 }

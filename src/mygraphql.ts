@@ -2,40 +2,56 @@
 
 import Config from './aws-exports'
 
+/* 
+  javascript client to appsync https://andrewgriffithsonline.com/blog/serverless-websockets-on-aws/#client-side-application-code 
+*/
 export default class Mygraphql {
   public gql: any
   public client: any
 
+  /*
+    add to interface Global in \node_modules\@types\node\index.d.ts
+      WebSocket: any; 
+      window: any; 
+      localStorage: any;
+  */
   constructor() {
-    // appsync client
+    // environment setup
     const config = new Config()
-    ;(global as any).WebSocket = require('ws')(
-      global as any
-    ).window = (global as any).window || {
-      setTimeout: setTimeout,
-      clearTimeout: clearTimeout,
-      WebSocket: (global as any).WebSocket,
-      ArrayBuffer: global.ArrayBuffer,
-      addEventListener: function() {},
-      navigator: { onLine: true }
+    if (!global.WebSocket) {
+      global.WebSocket = require('ws')
     }
-    ;(global as any).localStorage = {
-      store: {},
-      getItem: function(key) {
-        return this.store[key]
-      },
-      setItem: function(key, value) {
-        this.store[key] = value
-      },
-      removeItem: function(key) {
-        delete this.store[key]
+    if (!global.window) {
+      global.window = {
+        setTimeout: setTimeout,
+        clearTimeout: clearTimeout,
+        WebSocket: global.WebSocket,
+        ArrayBuffer: global.ArrayBuffer,
+        addEventListener: function() {},
+        navigator: { onLine: true }
+      }
+    }
+    if (!global.localStorage) {
+      global.localStorage = {
+        store: {},
+        getItem: function(key) {
+          return this.store[key]
+        },
+        setItem: function(key, value) {
+          this.store[key] = value
+        },
+        removeItem: function(key) {
+          delete this.store[key]
+        }
       }
     }
 
     require('es6-promise').polyfill()
     require('isomorphic-fetch')
 
+    // appsync client
     const AUTH_TYPE = require('aws-appsync/lib/link/auth-link').AUTH_TYPE
+    // issue https://github.com/awslabs/aws-mobile-appsync-sdk-js/issues/233 causes next statement to fail in appsync@1.3.4 -- rolled back to 1.3.3
     const AWSAppSyncClient = require('aws-appsync').default
     const url = config.ENDPOINT
     const region = config.REGION

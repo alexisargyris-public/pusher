@@ -3,8 +3,7 @@
 import * as vscode from 'vscode'
 import Database from './db'
 
-let timeoutLimit = 1000
-let timeout = null
+let timerId = null
 
 /**
  * This is called by vscode to activate the command contributed by the extension
@@ -29,23 +28,31 @@ export function activate(context: vscode.ExtensionContext) {
       return new Promise((resolve, reject) => {
         if (typeof fileId === 'undefined') {
           // fileId is not set; check if the file exists in the db
-          return db.findFile(path).then(id => {
-            if (id) {
-              // the file exists
-              fileId = id
-              resolve()
-            } else {
-              // the file does not exist; create it
-              return db.createFile(path).then(id => {
-                if (id) {
-                  fileId = id
-                  resolve()
-                } else {
-                  reject('fileId creation failed')
-                }
-              })
-            }
-          })
+          return db
+            .findFile(fileName)
+            .then(id => {
+              if (id) {
+                // the file exists
+                fileId = id
+                resolve()
+              } else {
+                // the file does not exist; create it
+                return db.createFile(fileName).then(id => {
+                  if (id) {
+                    fileId = id
+                    resolve()
+                  } else {
+                    reject('fileId creation failed')
+                  }
+                })
+              }
+            })
+            .catch(err => {
+              // something went wrong; deactivate the extension
+              console.error(`something is wrong ${err}`)
+              this.statusBarItem.hide()
+              deactivate()
+            })
         } else {
           // fileId is already set
           resolve()
@@ -101,79 +108,74 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // update status
-    statusBarItem.text = 'pusher: ' + eventQueue.length
+    statusBarItem.text = extBarLabel + eventQueue.length
     statusBarItem.show()
-
-    // check if not already processing and that there is an event to process
-    if (!isProcessing && eventQueue.length > 0) {
-      isProcessing = true
+    // check if there is an event to process
+    if (eventQueue.length > 0) {
+      // an event exists; process it
       processOneEvent()
         .then(() => {
-          isProcessing = false
           eventQueue.shift()
+          // reset the timeout
+          timerId = setTimeout(eventLoop, timeoutLimit)
         })
         .catch(error => {
-          isProcessing = false
-          vscode.window.showErrorMessage('an error occured: ' + error)
+          vscode.window.showErrorMessage(error)
         })
+    } else {
+      // an event does not exist; reset the timeout
+      timerId = setTimeout(eventLoop, timeoutLimit)
     }
   }
-
-  // exit immediately if no document is open
-  if (typeof vscode.window.activeTextEditor === 'undefined')
-    // no editor is open
-    // FIXME: return something that will allow successful activation after an editor is opened
-    return
-
-  console.log('pusher activated')
-
-  // status bar item
-  let statusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right
-  )
-
-  const db = new Database()
-  // path of file to watch
-  const path = vscode.window.activeTextEditor.document.fileName
+  const timeoutLimit = 1000
+  const extBarLabel = 'Pusher: '
   let fileId: String
   let sessionId: String
   let eventQueue: any[] = []
-  let isProcessing: Boolean = false
   let isFirstEvent: Boolean = true
-  timeout = setInterval(eventLoop, timeoutLimit)
 
-  // TODO: reset when user renames file
-
+  // if no document is open exit immediately
+  if (typeof vscode.window.activeTextEditor === 'undefined') return
+  const db = new Database()
+  const fileName = vscode.window.activeTextEditor.document.fileName
   // change active editor event handler
   vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
-    // update status bar
-    if (path === event.document.fileName) statusBarItem.show()
-    else statusBarItem.hide()
+    // the active editor was changed; hide and deactivate the extension
+    this.statusBarItem.hide()
+    deactivate()
   })
-
-  // change text event handler
+  // change text content event handler
   vscode.workspace.onDidChangeTextDocument(
     (event: vscode.TextDocumentChangeEvent) => {
-      // process the event only if it occured to the document being watched
-      if (event.contentChanges.length && path === event.document.fileName) {
+      // the text in the active editor was changed; process the change
+      if (event.contentChanges.length) {
         if (isFirstEvent) {
-          isFirstEvent = false
           eventQueue.push(createFirstEvent(event.document))
+          isFirstEvent = false
         } else {
           eventQueue.push(event)
         }
       }
     }
   )
-
-  // command associated with extension
-  let disposable = vscode.commands.registerCommand('extension.pusher', () => {})
+  // the event processing loop
+  timerId = setTimeout(eventLoop, timeoutLimit)
+  // the command associated with the extension
+  let disposable = vscode.commands.registerCommand('extension.pusher', () => {
+    // all necessary set up work has already been done (on first activation); nothing to do here (i.e. on each subsequent activation)
+  })
   context.subscriptions.push(disposable)
+  // status bar item
+  let statusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right
+  )
+  console.log('pusher activated')
+  // TODO: user renames file
 }
 
 /**
  * This is called by vscode when the extension needs to be deactivated
  */
 export function deactivate() {
-  clearInterval(timeout)
+  clearTimeout(timerId)
 }
