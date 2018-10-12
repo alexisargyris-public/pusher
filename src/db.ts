@@ -8,8 +8,7 @@ export default class Database {
   constructor() {
     this.gr = new Mygraphql()
   }
-  public createEvent(sessionId: String, content: String) {
-    let timestamp = Date.now()
+  public createEvent(timestamp, sessionId: String, content: String) {
     let mutation = `
     mutation ce{
       createEvent(input: {
@@ -83,9 +82,7 @@ export default class Database {
     const regex = /\\"/gi
     let temp = JSON.stringify(JSON.stringify(path)) // double escape backslashes
     let temp2 = temp.replace(regex, '') // remove \"
-    let temp3 = temp2.substring(1, temp2.length - 1)
-    console.log(path)
-    console.log(temp3)
+    let temp3 = temp2.substring(1, temp2.length - 1) // remove outer double quotes
     return temp3
   }
 }
