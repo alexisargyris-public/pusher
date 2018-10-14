@@ -18,6 +18,7 @@ export default class Mygraphql {
   constructor() {
     // environment setup
     const config = new Config()
+    // TODO: see https://www.typescriptlang.org/docs/handbook/declaration-merging.html
     if (!global.WebSocket) {
       global.WebSocket = require('ws')
     }

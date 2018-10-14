@@ -8,6 +8,85 @@ export default class Database {
   constructor() {
     this.gr = new Mygraphql()
   }
+  public batchCreateEvent(events: any[]) {
+    let input: string = ''
+    events.forEach(event => {
+      // eventContent is a large string and needs to be stringified
+      // double stringify to escape all double quotes...
+      let eventContent = JSON.stringify(JSON.stringify(event.content))
+      // remove outer double quotes
+      eventContent = eventContent.substring(1, eventContent.length - 1)
+      // the rest of the object should not be stringified
+      input += `,{
+        eventId: "${event.eventId}", 
+        sessionId: "${event.sessionId}", 
+        content: "${eventContent}"
+      }`
+    })
+    input = input.substring(1) // remove first comma
+    let mutation = `
+    mutation bce {
+      batchCreateEvent(input: [${input}]) {
+        eventId
+      }
+    }
+    `
+    return this.gr.mutate(mutation).then(res => {
+      return res.data.batchCreateEvent // events array
+    })
+  }
+  public createSession(fileId: String) {
+    let mutation = `
+    mutation {
+      createSession(input: {
+        sessionId: "${Date.now()}"
+        fileId: "${fileId}"
+      }){
+        sessionId
+      }
+    }
+    `
+    return this.gr.mutate(mutation).then(res => {
+      return res.data.createSession.sessionId
+    })
+  }
+  public createFile(path: String) {
+    let bookId = 'amomonaima' // TODO: read the list of available bookIds
+    // double escape backslash when writing paths
+    let mutation = `
+    mutation cf{
+      createFile(input: {
+        fileId: "${Date.now()}"
+        bookId: "${bookId}"
+        path: "${path.replace(/\\/g, '\\\\')}"
+      }){
+        fileId
+      }
+    }
+    `
+    return this.gr.mutate(mutation).then(res => {
+      return res.data.createFile.fileId
+    })
+  }
+  public findFile(path: String) {
+    // find a file and return its id or false
+    // quadruple escape backslash when reading paths
+    const qr = `
+    query lfbp{
+      listFilesByPath(path: "${path.replace(/\\/g, '\\\\\\\\')}") {
+        items {
+          fileId
+        }
+      }
+    }
+    `
+    return this.gr.query(qr).then(res => {
+      return res.data.listFilesByPath.items.length
+        ? res.data.listFilesByPath.items[0].fileId
+        : false
+    })
+  }
+  // TODO: deprecated
   public createEvent(timestamp, sessionId: String, content: String) {
     let mutation = `
     mutation ce{
@@ -22,67 +101,5 @@ export default class Database {
     return this.gr.mutate(mutation).then(res => {
       return res.data.createEvent.eventId
     })
-  }
-  public createSession(fileId: String) {
-    let timestamp = Date.now()
-    let mutation = `
-    mutation {
-      createSession(input: {
-        sessionId: "${timestamp}"
-        fileId: "${fileId}"
-      }){
-        sessionId
-      }
-    }
-    `
-    return this.gr.mutate(mutation).then(res => {
-      return res.data.createSession.sessionId
-    })
-  }
-  public createFile(path: String) {
-    let timestamp = Date.now()
-    let bookId = 'amomonaima' // FIXME: read the list of available bookIds
-    let mutation = `
-    mutation cf{
-      createFile(input: {
-        fileId: "${timestamp}"
-        bookId: "${bookId}"
-        path: "${this.preparePath(path)}"
-      }){
-        fileId
-      }
-    }
-    `
-    return this.gr.mutate(mutation).then(res => {
-      return res.data.createFile.fileId
-    })
-  }
-  public findFile(path: String) {
-    // find a file and return its id or false
-    return this.listFilesByPath(path).then(items => {
-      return items.length >= 1 ? items[0].fileId : false
-    })
-  }
-  private listFilesByPath(path: String) {
-    const qr = `
-    query lfbp{
-      listFilesByPath(path: "${this.preparePath(path)}") {
-        items {
-          fileId
-        }
-      }
-    }
-    `
-    return this.gr.query(qr).then(res => {
-      return res.data.listFilesByPath.items
-    })
-  }
-  private preparePath(path: String) {
-    // ref: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace
-    const regex = /\\"/gi
-    let temp = JSON.stringify(JSON.stringify(path)) // double escape backslashes
-    let temp2 = temp.replace(regex, '') // remove \"
-    let temp3 = temp2.substring(1, temp2.length - 1) // remove outer double quotes
-    return temp3
   }
 }
