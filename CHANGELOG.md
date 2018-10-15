@@ -2,6 +2,17 @@
 
 All notable changes to the "pusher" extension will be documented in this file.
 
+## [1.2.0](https://github.com/anemomazomata/pusher/releases/tag/1.2.0) (2018-10-15)
+
+### Fixed
+
+- time of event occurence
+
+### Added
+
+- batch event transfer
+- double event queue (to handle events occuring while processing events)
+
 ## [1.1.2](https://github.com/anemomazomata/pusher/releases/tag/1.1.2) (2018-09-30)
 
 ### Fixed

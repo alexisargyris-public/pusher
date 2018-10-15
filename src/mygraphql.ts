@@ -9,16 +9,9 @@ export default class Mygraphql {
   public gql: any
   public client: any
 
-  /*
-    add to interface Global in \node_modules\@types\node\index.d.ts
-      WebSocket: any; 
-      window: any; 
-      localStorage: any;
-  */
   constructor() {
     // environment setup
     const config = new Config()
-    // TODO: see https://www.typescriptlang.org/docs/handbook/declaration-merging.html
     if (!global.WebSocket) {
       global.WebSocket = require('ws')
     }
