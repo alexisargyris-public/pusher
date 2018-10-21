@@ -3,7 +3,55 @@
 import * as vscode from 'vscode'
 import Database from './db'
 
-let timerId = null
+class EventQueue {
+  private mainQueue: any[] = []
+  private spareQueue: any[] = []
+  private isQueueBusy: boolean = false
+  private sizeOfQueue: number = 0
+  // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html
+  readonly sizeQueueLimit = 100000
+  constructor() {
+    // set up timeout
+  }
+  private calcSize(object): number {
+    //  https://stackoverflow.com/questions/1248302/how-to-get-the-size-of-a-javascript-object
+    let objectList = []
+    let stack = [object]
+    let bytes = 0
+
+    while (stack.length) {
+      let value = stack.pop()
+
+      if (typeof value === 'boolean') {
+        bytes += 4
+      } else if (typeof value === 'string') {
+        bytes += value.length * 2
+      } else if (typeof value === 'number') {
+        bytes += 8
+      } else if (
+        typeof value === 'object' &&
+        objectList.indexOf(value) === -1
+      ) {
+        objectList.push(value)
+
+        for (var i in value) {
+          stack.push(value[i])
+        }
+      }
+    }
+    return bytes
+  }
+  private flushQueue() {}
+  addEvent(ev: any) {
+    // decide to which queue to add the event
+    // calculate the size of the current event
+    // update the event queue size total
+    // decide if the main queue is large enough to flush
+  }
+}
+
+// let timerId = null
+let eq = new EventQueue()
 let statusBarItem: vscode.StatusBarItem
 
 /**
@@ -11,7 +59,7 @@ let statusBarItem: vscode.StatusBarItem
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
-  const eventLoopTimeoutLimit = 4000
+  const eventLoopTimeoutLimit = 4000 // how often does the event loop get called
   const eventQueueProcessLimit = 19 // actually the limit is 25, see https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchWriteItem.html
   const extBarLabel = 'Pusher: '
   let fileId: any // Promise<String | Boolean>
@@ -56,9 +104,7 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     })
   }
-
   function eventLoop() {
-    // FIXME: what will happen if we are inside the event loop and an edit event changes the event queue?
     function processEventsBatch(): Promise<any[]> {
       return new Promise((resolve, reject) => {
         let events = []
@@ -87,6 +133,16 @@ export async function activate(context: vscode.ExtensionContext) {
     // update status
     statusBarItem.text = extBarLabel + eventQueue.length
     statusBarItem.show()
+    if (isReadyToFlush(eventQueue)) {
+      isEventLoopBusy = true
+      flush(eventQueue)
+    } else {
+      // reset the timeout
+      timerId = setTimeout(eventLoop, eventLoopTimeoutLimit)
+      isEventLoopBusy = false
+    }
+
+    /*
     // check if there are any events to process
     if (eventQueue.length) {
       // there are events to process
@@ -139,6 +195,21 @@ export async function activate(context: vscode.ExtensionContext) {
       // no events to process; reset the timeout
       timerId = setTimeout(eventLoop, eventLoopTimeoutLimit)
     }
+*/
+  }
+  function onTextChange(event: any) {
+    // the text in the active editor was changed; store the change
+    if (event.contentChanges.length) {
+      event.timestamp = Date.now()
+      eq.addEvent(event)
+      // // check which event queue to use
+      // if (isEventLoopBusy) {
+      //   console.log('main loop is busy')
+      //   eventQueueSpare.push(event)
+      // } else {
+      //   eventQueue.push(event)
+      // }
+    }
   }
 
   // if no document is open, exit immediately
@@ -154,22 +225,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // change text content event handler
     // TODO: event should be vscode.TextDocumentChangeEvent
     vscode.workspace.onDidChangeTextDocument((event: any) => {
-      // the text in the active editor was changed; store the change
-      if (event.contentChanges.length) {
-        event.timestamp = Date.now()
-        // check which event queue to use
-        if (isEventLoopBusy) {
-          console.log('main loop is busy')
-          eventQueueSpare.push(event)
-        } else {
-          eventQueue.push(event)
-        }
-      }
+      onTextChange(event)
     })
     // change active editor event handler
     vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
       // the active editor was changed; hide and deactivate the extension
-      statusBarItem.hide()
       deactivate()
     })
     // the event processing loop
