@@ -3,18 +3,71 @@
 import * as vscode from 'vscode'
 import Database from './db'
 
+class Queue {
+  protected contents: string = ''
+  protected eventsCounter: number = 0
+  makeContent(event: any): string {
+    return JSON.stringify({
+      eventId: event.timestamp,
+      content: event.contentChanges[0]
+    })
+  }
+  add(event) {
+    this.eventsCounter++
+    this.contents += this.makeContent(event)
+  }
+  empty() {
+    this.contents.length =0
+  }
+  package(): string {
+    return JSON.stringify(this.contents)
+  }
+  getContents() { return this.contents }
+  getEventsCounter() { return this.eventsCounter }
+}
+class FlashableQueue extends Queue {
+  private readonly sizeLimit: number = 1000
+  protected sessionId: string
+  protected db: any
+  constructor(sessionId: string, db: any) {
+    super()
+    this.sessionId = sessionId
+    this.db = db
+  }
+  add(event) {
+    this.eventCounter++
+    this.contents += this.makeContent(event)
+    this.contentsSize += this.contents.length
+    if (this.contentsSize > this.sizeLimit) {
+      this.flash()
+    }
+  }
+  flash() {
+    let ev = {
+      eventId: makeTimestamp(),
+      sessionId: this.sessionId,
+      content: 
+    }
+    return this.db.createEvent()
+  }
+}
+
+/**
+ * EventQueue provides functionality related to event queue management
+ * 
+ * how to calculate the size of a js object:
+ * https://stackoverflow.com/questions/1248302/how-to-get-the-size-of-a-javascript-object
+ * aws dynamodb limits:
+ * https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html
+ */
 class EventQueue {
   private mainQueue: any[] = []
-  private spareQueue: any[] = []
-  private isQueueBusy: boolean = false
-  private sizeOfQueue: number = 0
-  // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html
+  private spareQueue: any[] = [] // to store events while the contents of the main queue are being processed
+  private isMainQueueBusy: boolean = false
+  private sizeOfMainQueue: number = 0
   readonly sizeQueueLimit = 100000
-  constructor() {
-    // set up timeout
-  }
+  constructor() {}
   private calcSize(object): number {
-    //  https://stackoverflow.com/questions/1248302/how-to-get-the-size-of-a-javascript-object
     let objectList = []
     let stack = [object]
     let bytes = 0
@@ -44,13 +97,15 @@ class EventQueue {
   private flushQueue() {}
   addEvent(ev: any) {
     // decide to which queue to add the event
+    if (this.isMainQueueBusy) {
+      this.spareQueue.push(ev)
+    } else {}
     // calculate the size of the current event
     // update the event queue size total
     // decide if the main queue is large enough to flush
   }
 }
 
-// let timerId = null
 let eq = new EventQueue()
 let statusBarItem: vscode.StatusBarItem
 
@@ -200,7 +255,7 @@ export async function activate(context: vscode.ExtensionContext) {
   function onTextChange(event: any) {
     // the text in the active editor was changed; store the change
     if (event.contentChanges.length) {
-      event.timestamp = Date.now()
+      event.timestamp = makeTimestamp()
       eq.addEvent(event)
       // // check which event queue to use
       // if (isEventLoopBusy) {
@@ -233,7 +288,7 @@ export async function activate(context: vscode.ExtensionContext) {
       deactivate()
     })
     // the event processing loop
-    timerId = setTimeout(eventLoop, eventLoopTimeoutLimit)
+    // timerId = setTimeout(eventLoop, eventLoopTimeoutLimit)
     // the command associated with the extension
     let disposable = vscode.commands.registerCommand('extension.pusher', () => {
       // all necessary set up work has already been done (on first activation); nothing to do here (i.e. on each subsequent activation)
@@ -257,5 +312,8 @@ export async function activate(context: vscode.ExtensionContext) {
  */
 export function deactivate() {
   if (statusBarItem) statusBarItem.hide()
-  if (timerId) clearTimeout(timerId)
+}
+
+function makeTimestamp(): string {
+  return Date.now().toString()
 }
