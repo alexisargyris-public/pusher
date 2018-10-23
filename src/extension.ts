@@ -12,49 +12,64 @@ class Queue {
       content: event.contentChanges[0]
     })
   }
-  add(event) {
+  add(editorEvent): void {
     this.eventsCounter++
-    this.contents += this.makeContent(event)
+    this.contents += this.makeContent(editorEvent)
   }
-  empty() {
-    this.contents.length =0
+  empty(): void {
+    this.contents = ''
   }
-  package(): string {
-    return JSON.stringify(this.contents)
+  getContents(): string {
+    return this.contents
   }
-  getContents() { return this.contents }
-  getEventsCounter() { return this.eventsCounter }
+  getContentsSize(): number {
+    return this.contents.length
+  }
+  getEventsCounter(): number {
+    return this.eventsCounter
+  }
 }
 class FlashableQueue extends Queue {
-  private readonly sizeLimit: number = 1000
-  protected sessionId: string
-  protected db: any
-  constructor(sessionId: string, db: any) {
+  private sessionId: string
+  private db: Database
+  constructor(sessionId: string, db: Database) {
     super()
     this.sessionId = sessionId
     this.db = db
   }
-  add(event) {
-    this.eventCounter++
-    this.contents += this.makeContent(event)
-    this.contentsSize += this.contents.length
-    if (this.contentsSize > this.sizeLimit) {
-      this.flash()
-    }
-  }
   flash() {
-    let ev = {
-      eventId: makeTimestamp(),
-      sessionId: this.sessionId,
-      content: 
+    return this.db
+      .createEvent(makeTimestamp(), this.sessionId, this.contents)
+      .then(() => {})
+      .catch(error => {
+        // something went wrong
+        let errorMsg = `[ERROR] Pusher.eventLoop caused: ${error.message}`
+        console.error(errorMsg)
+        vscode.window.showErrorMessage(errorMsg)
+        deactivate()
+      })
+  }
+}
+class queueController {
+  private mainQueue: FlashableQueue
+  private spareQueue: Queue
+  private readonly mainSizeLimit: any = 1000
+  constructor(sessionId: string, db: Database) {
+    this.mainQueue = new FlashableQueue(sessionId, db)
+    this.spareQueue = new Queue()
+  }
+  add(editorEvent) {
+    if (this.mainQueue.getContentsSize > this.mainSizeLimit) {
+      this.spareQueue.add(editorEvent)
+    } else {
+      this.mainQueue.add(editorEvent)
     }
-    return this.db.createEvent()
   }
 }
 
 /**
  * EventQueue provides functionality related to event queue management
- * 
+ *
  * how to calculate the size of a js object:
  * https://stackoverflow.com/questions/1248302/how-to-get-the-size-of-a-javascript-object
  * aws dynamodb limits:
@@ -99,7 +114,8 @@ class EventQueue {
     // decide to which queue to add the event
     if (this.isMainQueueBusy) {
       this.spareQueue.push(ev)
-    } else {}
+    } else {
+    }
     // calculate the size of the current event
     // update the event queue size total
     // decide if the main queue is large enough to flush
@@ -123,6 +139,8 @@ export async function activate(context: vscode.ExtensionContext) {
   let eventQueueSpare: any[] = []
   let isEventLoopBusy: boolean = false
   let eventsBeingProcessed: number
+  const spareQueue: Queue = new Queue()
+  let mainQueue: Queue
 
   function createFirstChange(doc) {
     return {
@@ -276,7 +294,9 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.activeTextEditor.document.fileName
     )
     sessionId = await createSession(fileId)
-    eventQueue.push(createFirstChange(vscode.window.activeTextEditor.document))
+    mainQueue = new FlashableQueue(sessionId, db, spareQueue)
+    mainQueue.add(createFirstChange(vscode.window.activeTextEditor.document))
+    // eventQueue.push(createFirstChange(vscode.window.activeTextEditor.document))
     // change text content event handler
     // TODO: event should be vscode.TextDocumentChangeEvent
     vscode.workspace.onDidChangeTextDocument((event: any) => {
