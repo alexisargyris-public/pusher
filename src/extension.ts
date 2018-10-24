@@ -43,22 +43,24 @@ class FlashableQueue extends Queue {
   }
   flash() {
     this.isFlashing = true
-    return this.db.createEvent(makeTimestamp(), this.sessionId, this.contents).then(() => {
-      this.isFlashing = false
-      this.empty()
-    })
+    return this.db
+      .createEvent(makeTimestamp(), this.sessionId, this.contents)
+      .then(() => {
+        this.isFlashing = false
+        this.empty()
+      })
   }
 }
 class QueueController {
   private mainQueue: FlashableQueue
   private spareQueue: Queue
-  private readonly queueSizeLimit: any = 1000 // FIXME: should be of type number
+  private readonly queueSizeLimit: number = 1000
   constructor(sessionId: string, db: Database) {
     this.mainQueue = new FlashableQueue(sessionId, db)
     this.spareQueue = new Queue()
   }
   async add(editorEvent) {
-    if (this.mainQueue.getContentsSize > this.queueSizeLimit) {
+    if (this.mainQueue.getContentsSize() > this.queueSizeLimit) {
       // main queue is full, start flashing and meanwhile use spare queue
       try {
         // check if the main queue is already being flashed
@@ -73,9 +75,9 @@ class QueueController {
         }
         // store event in spare queue
         this.spareQueue.add(editorEvent)
-      } catch(error) {
+      } catch (error) {
         // something went wrong
-        let errorMsg = `[ERROR] Pusher.eventLoop caused: ${error.message}`
+        let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
         console.error(errorMsg)
         vscode.window.showErrorMessage(errorMsg)
         deactivate()
@@ -135,11 +137,11 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     })
   }
-  function onTextChange(event: any) {
+  function onTextChange(event: any, qc: QueueController) {
     // the text in the active editor was changed; store the change
     if (event.contentChanges.length) {
       event.timestamp = makeTimestamp()
-      this.qc.addEvent(event)
+      qc.add(event)
     }
   }
 
@@ -147,17 +149,17 @@ export async function activate(context: vscode.ExtensionContext) {
   if (typeof vscode.window.activeTextEditor === 'undefined') return
   // init appsync db and first event (whole document)
   try {
+    db = new Database()
     fileId = await findOrCreateFile(
       vscode.window.activeTextEditor.document.fileName
     )
     sessionId = await createSession(fileId)
-    db = new Database()
     qc = new QueueController(sessionId, db)
     qc.add(createFirstChange(vscode.window.activeTextEditor.document))
     // change text content event handler
     // FIXME: event should be vscode.TextDocumentChangeEvent
     vscode.workspace.onDidChangeTextDocument((event: any) => {
-      onTextChange(event)
+      onTextChange(event, qc)
     })
     // change active editor event handler
     vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
@@ -173,8 +175,9 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBarItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right
     )
+    statusBarItem.text = this.extBarLabel
+    statusBarItem.show()
     console.log('pusher activated')
-    // TODO: user renames file
   } catch (err) {
     // something went wrong; deactivate the extension
     console.error(`[ERROR] Pusher.activate caused: ${err}`)
