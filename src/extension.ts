@@ -6,7 +6,7 @@ import Database from './db'
 class Queue {
   protected contents: string = ''
   protected eventsCounter: number = 0
-  makeContent(event: any): string {
+  makeContents(event: any): string {
     return JSON.stringify({
       eventId: event.timestamp,
       content: event.contentChanges[0]
@@ -14,10 +14,11 @@ class Queue {
   }
   add(editorEvent): void {
     this.eventsCounter++
-    this.contents += this.makeContent(editorEvent)
+    this.contents += this.makeContents(editorEvent)
   }
   empty(): void {
     this.contents = ''
+    this.eventsCounter = 0
   }
   getContents(): string {
     return this.contents
@@ -38,13 +39,23 @@ class FlashableQueue extends Queue {
     this.sessionId = sessionId
     this.db = db
   }
-  putContents(contents) {
-    this.contents = contents
+  private prepareContents(cont): string {
+    // double stringify to escape all double quotes...
+    let eventContent = JSON.stringify(cont)
+    // remove outer double quotes
+    eventContent = eventContent.substring(1, eventContent.length - 1)
+    return eventContent
+  }
+  pushContents(contents) {
+    // TODO: what separator is required between events in same package?
+    // TODO: in different packages?
+    this.contents += contents // TODO: is the order correct?
   }
   flash() {
     this.isFlashing = true
+    let cnt = this.prepareContents(this.contents)
     return this.db
-      .createEvent(makeTimestamp(), this.sessionId, this.contents)
+      .createEvent(makeTimestamp(), this.sessionId, cnt)
       .then(() => {
         this.isFlashing = false
         this.empty()
@@ -63,7 +74,9 @@ class QueueController {
     this.sbi = sbi
   }
   private updateStatus() {
-    this.sbi.text = `${this.extBarLabel}: M${this.mainQueue.getContentsSize} (${this.mainQueue.getEventsCounter}), S${this.spareQueue.getContentsSize} (${this.spareQueue.getEventsCounter})`
+    this.sbi.text = `${
+      this.extBarLabel
+    }: M ${this.mainQueue.getContentsSize()}(${this.mainQueue.getEventsCounter()}), S ${this.spareQueue.getContentsSize()}(${this.spareQueue.getEventsCounter()})`
     this.sbi.show()
   }
   async add(editorEvent) {
@@ -76,12 +89,14 @@ class QueueController {
           let spareContent = this.spareQueue.getContents()
           // check if there are any spare events waiting to be processed
           if (spareContent.length > 0) {
-            this.mainQueue.putContents(spareContent)
+            this.mainQueue.add(editorEvent)
+            this.mainQueue.pushContents(spareContent)
             this.spareQueue.empty()
           }
+        } else {
+          // store event in spare queue
+          this.spareQueue.add(editorEvent)
         }
-        // store event in spare queue
-        this.spareQueue.add(editorEvent)
       } catch (error) {
         // something went wrong
         let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
@@ -160,9 +175,7 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.activeTextEditor.document.fileName
     )
     sessionId = await createSession(fileId)
-    sbi = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right
-    )
+    sbi = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right)
     qc = new QueueController(sessionId, db, sbi)
     qc.add(createFirstChange(vscode.window.activeTextEditor.document))
     // change text content event handler
