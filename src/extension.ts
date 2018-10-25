@@ -52,12 +52,19 @@ class FlashableQueue extends Queue {
   }
 }
 class QueueController {
+  private readonly extBarLabel: string = 'Pusher'
   private mainQueue: FlashableQueue
   private spareQueue: Queue
   private readonly queueSizeLimit: number = 1000
-  constructor(sessionId: string, db: Database) {
+  private sbi: vscode.StatusBarItem
+  constructor(sessionId: string, db: Database, sbi: vscode.StatusBarItem) {
     this.mainQueue = new FlashableQueue(sessionId, db)
     this.spareQueue = new Queue()
+    this.sbi = sbi
+  }
+  private updateStatus() {
+    this.sbi.text = `${this.extBarLabel}: M${this.mainQueue.getContentsSize} (${this.mainQueue.getEventsCounter}), S${this.spareQueue.getContentsSize} (${this.spareQueue.getEventsCounter})`
+    this.sbi.show()
   }
   async add(editorEvent) {
     if (this.mainQueue.getContentsSize() > this.queueSizeLimit) {
@@ -80,27 +87,26 @@ class QueueController {
         let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
         console.error(errorMsg)
         vscode.window.showErrorMessage(errorMsg)
-        deactivate()
+        deactivate(this.sbi)
       }
     } else {
-      // main queue still has space, use it
+      // main queue still has space, store the event
       this.mainQueue.add(editorEvent)
     }
+    this.updateStatus()
   }
 }
-
-let statusBarItem: vscode.StatusBarItem
 
 /**
  * This is called by vscode to activate the command contributed by the extension
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
-  const extBarLabel = 'Pusher: '
   let fileId: any // Promise<String | Boolean>
   let sessionId: any // Promise<String>
   let db: Database
   let qc: QueueController
+  let sbi: vscode.StatusBarItem
 
   function createFirstChange(doc) {
     return {
@@ -154,7 +160,10 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.activeTextEditor.document.fileName
     )
     sessionId = await createSession(fileId)
-    qc = new QueueController(sessionId, db)
+    sbi = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right
+    )
+    qc = new QueueController(sessionId, db, sbi)
     qc.add(createFirstChange(vscode.window.activeTextEditor.document))
     // change text content event handler
     // FIXME: event should be vscode.TextDocumentChangeEvent
@@ -164,32 +173,26 @@ export async function activate(context: vscode.ExtensionContext) {
     // change active editor event handler
     vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
       // the active editor was changed; hide and deactivate the extension
-      deactivate()
+      deactivate(sbi)
     })
     // the command associated with the extension
     let disposable = vscode.commands.registerCommand('extension.pusher', () => {
       // all necessary set up work has already been done (on first activation); nothing to do here (i.e. on each subsequent activation)
     })
     context.subscriptions.push(disposable)
-    // status bar item
-    statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right
-    )
-    statusBarItem.text = this.extBarLabel
-    statusBarItem.show()
     console.log('pusher activated')
   } catch (err) {
     // something went wrong; deactivate the extension
-    console.error(`[ERROR] Pusher.activate caused: ${err}`)
-    deactivate()
+    console.error(`[ERROR] Pusher.activate caused: ${err.message}`)
+    deactivate(sbi)
   }
 }
 
 /**
  * This is called by vscode when the extension needs to be deactivated
  */
-export function deactivate() {
-  if (statusBarItem) statusBarItem.hide()
+export function deactivate(sbi) {
+  if (sbi) sbi.hide()
 }
 
 function makeTimestamp(): string {
