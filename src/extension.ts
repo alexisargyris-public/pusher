@@ -4,17 +4,23 @@ import * as vscode from 'vscode'
 import Database from './db'
 
 class Queue {
+  protected readonly eventSeparator: string = '~'
   protected contents: string = ''
   protected eventsCounter: number = 0
-  makeContents(event: any): string {
+  private toString(event: any): string {
     return JSON.stringify({
       eventId: event.timestamp,
       content: event.contentChanges[0]
     })
   }
-  add(editorEvent): void {
-    this.eventsCounter++
-    this.contents += this.makeContents(editorEvent)
+  addString(newStr: string): void {
+    // later events are inserted _in front_ of earlier events
+    let toAdd = newStr.indexOf(this.eventSeparator) < 0 ? 1 : newStr.split(this.eventSeparator).length
+    this.eventsCounter += toAdd
+    this.contents = this.contents.length ? newStr + this.eventSeparator + this.contents : newStr
+  }
+  addEvent(editorEvent): void {
+    this.addString(this.toString(editorEvent))
   }
   empty(): void {
     this.contents = ''
@@ -40,16 +46,16 @@ class FlashableQueue extends Queue {
     this.db = db
   }
   private prepareContents(cont): string {
+    function compress(str): string {
+      // https://github.com/pieroxy/lz-string
+      return str
+    }
+  
     // double stringify to escape all double quotes...
     let eventContent = JSON.stringify(cont)
     // remove outer double quotes
     eventContent = eventContent.substring(1, eventContent.length - 1)
-    return eventContent
-  }
-  pushContents(contents) {
-    // TODO: what separator is required between events in same package?
-    // TODO: in different packages?
-    this.contents += contents // TODO: is the order correct?
+    return compress(eventContent)
   }
   flash() {
     this.isFlashing = true
@@ -89,13 +95,13 @@ class QueueController {
           let spareContent = this.spareQueue.getContents()
           // check if there are any spare events waiting to be processed
           if (spareContent.length > 0) {
-            this.mainQueue.add(editorEvent)
-            this.mainQueue.pushContents(spareContent)
+            this.mainQueue.addEvent(editorEvent)
+            this.mainQueue.addString(spareContent)
             this.spareQueue.empty()
           }
         } else {
           // store event in spare queue
-          this.spareQueue.add(editorEvent)
+          this.spareQueue.addEvent(editorEvent)
         }
       } catch (error) {
         // something went wrong
@@ -106,7 +112,7 @@ class QueueController {
       }
     } else {
       // main queue still has space, store the event
-      this.mainQueue.add(editorEvent)
+      this.mainQueue.addEvent(editorEvent)
     }
     this.updateStatus()
   }
@@ -125,7 +131,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   function createFirstChange(doc) {
     return {
-      timestamp: Date.now(),
+      timestamp: makeTimestamp(),
       contentChanges: [
         {
           range: new vscode.Range(0, 0, 0, 0),
