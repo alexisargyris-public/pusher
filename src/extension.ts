@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode'
 import Database from './db'
+import * as LZString from '../node_modules/lz-string'
 
 class Queue {
   protected readonly eventSeparator: string = '~'
@@ -15,14 +16,19 @@ class Queue {
   }
   addString(newStr: string): void {
     // later events are inserted _in front_ of earlier events
-    let toAdd = newStr.indexOf(this.eventSeparator) < 0 ? 1 : newStr.split(this.eventSeparator).length
-    this.eventsCounter += toAdd
-    this.contents = this.contents.length ? newStr + this.eventSeparator + this.contents : newStr
+    let newEventsCounter =
+      newStr.indexOf(this.eventSeparator) < 0
+        ? 1
+        : newStr.split(this.eventSeparator).length
+    this.eventsCounter += newEventsCounter
+    this.contents = this.contents.length
+      ? newStr + this.eventSeparator + this.contents
+      : newStr
   }
   addEvent(editorEvent): void {
     this.addString(this.toString(editorEvent))
   }
-  empty(): void {
+  emptyQueue(): void {
     this.contents = ''
     this.eventsCounter = 0
   }
@@ -37,21 +43,36 @@ class Queue {
   }
 }
 class FlashableQueue extends Queue {
+  private context: vscode.ExtensionContext
   private sessionId: string
   private db: Database
+  private readonly storageKey: string = 'anmz'
   isFlashing: boolean = false
-  constructor(sessionId: string, db: Database) {
+  loadedFirstChange: boolean = false
+  constructor(cntxt: vscode.ExtensionContext, sessionId: string, db: Database) {
     super()
+    this.context = cntxt
     this.sessionId = sessionId
     this.db = db
   }
-  private prepareContents(cont): string {
+  private readContents(cont): string {
+    function uncompress(str): string {
+      // https://github.com/pieroxy/lz-string
+      return LZString.decompressFromEncodedURIComponent(str)
+    }
+    let temp = uncompress(cont)
+    // add outer double quotes
+    temp = `"${temp}"`
+    // double parse to un-escape all double quotes
+    return JSON.parse(temp)
+  }
+  private writeContents(cont): string {
     function compress(str): string {
       // https://github.com/pieroxy/lz-string
-      return str
+      return LZString.compressToEncodedURIComponent(str)
     }
-  
-    // double stringify to escape all double quotes...
+
+    // double stringify to escape all double quotes
     let eventContent = JSON.stringify(cont)
     // remove outer double quotes
     eventContent = eventContent.substring(1, eventContent.length - 1)
@@ -59,23 +80,47 @@ class FlashableQueue extends Queue {
   }
   flash() {
     this.isFlashing = true
-    let cnt = this.prepareContents(this.contents)
+    let contentsToFlash = this.writeContents(this.contents)
     return this.db
-      .createEvent(makeTimestamp(), this.sessionId, cnt)
+      .createEvent(makeTimestamp(), this.sessionId, contentsToFlash)
       .then(() => {
         this.isFlashing = false
-        this.empty()
+        this.emptyQueue()
       })
+  }
+  saveContents() {
+    // check if there are any contents to save
+    return this.contents.length
+      ? this.context.workspaceState.update(
+          this.storageKey,
+          this.writeContents(this.contents)
+        )
+      : Promise.resolve()
+  }
+  loadContents() {
+    let temp = this.context.workspaceState.get(this.storageKey)
+    // check if there are any contents to load
+    if (temp) {
+      let temp2 = this.readContents(temp)
+      this.addString(temp2)
+      let temp3 = JSON.parse(temp2)
+      if (temp3.content.firstChange) this.loadedFirstChange = true
+    }
   }
 }
 class QueueController {
   private readonly extBarLabel: string = 'Pusher'
   private mainQueue: FlashableQueue
   private spareQueue: Queue
-  private readonly queueSizeLimit: number = 1000
+  private readonly queueSizeLimit: number = 5000
   private sbi: vscode.StatusBarItem
-  constructor(sessionId: string, db: Database, sbi: vscode.StatusBarItem) {
-    this.mainQueue = new FlashableQueue(sessionId, db)
+  constructor(
+    cntxt: vscode.ExtensionContext,
+    sessionId: string,
+    db: Database,
+    sbi: vscode.StatusBarItem
+  ) {
+    this.mainQueue = new FlashableQueue(cntxt, sessionId, db)
     this.spareQueue = new Queue()
     this.sbi = sbi
   }
@@ -85,36 +130,41 @@ class QueueController {
     }: M ${this.mainQueue.getContentsSize()}(${this.mainQueue.getEventsCounter()}), S ${this.spareQueue.getContentsSize()}(${this.spareQueue.getEventsCounter()})`
     this.sbi.show()
   }
+  mergeQueues() {
+    // move any events from spare to main queue
+    if (this.spareQueue.getEventsCounter() > 0) {
+      this.mainQueue.addString(this.spareQueue.getContents())
+      this.spareQueue.emptyQueue()
+    }
+  }
   async add(editorEvent) {
     if (this.mainQueue.getContentsSize() > this.queueSizeLimit) {
-      // main queue is full, start flashing and meanwhile use spare queue
+      // main queue is full, start flashing and meanwhile store events in spare queue
+      this.spareQueue.addEvent(editorEvent)
       try {
         // check if the main queue is already being flashed
         if (!this.mainQueue.isFlashing) {
           let fl = await this.mainQueue.flash()
-          let spareContent = this.spareQueue.getContents()
-          // check if there are any spare events waiting to be processed
-          if (spareContent.length > 0) {
-            this.mainQueue.addEvent(editorEvent)
-            this.mainQueue.addString(spareContent)
-            this.spareQueue.empty()
-          }
-        } else {
-          // store event in spare queue
-          this.spareQueue.addEvent(editorEvent)
+          this.mergeQueues()
         }
       } catch (error) {
         // something went wrong
         let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
         console.error(errorMsg)
         vscode.window.showErrorMessage(errorMsg)
-        deactivate(this.sbi)
+        deactivate(this.sbi, this)
       }
     } else {
       // main queue still has space, store the event
       this.mainQueue.addEvent(editorEvent)
     }
     this.updateStatus()
+  }
+  saveState() {
+    return this.mainQueue.saveContents() // async function
+  }
+  loadState() {
+    this.mainQueue.loadContents() // sync function
   }
 }
 
@@ -137,7 +187,8 @@ export async function activate(context: vscode.ExtensionContext) {
           range: new vscode.Range(0, 0, 0, 0),
           rangeLength: 0,
           rangeOffset: 0,
-          text: doc.getText()
+          text: doc.getText(),
+          firstChange: true
         }
       ]
     }
@@ -166,6 +217,7 @@ export async function activate(context: vscode.ExtensionContext) {
   }
   function onTextChange(event: any, qc: QueueController) {
     // the text in the active editor was changed; store the change
+    deactivate(sbi, qc)
     if (event.contentChanges.length) {
       event.timestamp = makeTimestamp()
       qc.add(event)
@@ -182,8 +234,12 @@ export async function activate(context: vscode.ExtensionContext) {
     )
     sessionId = await createSession(fileId)
     sbi = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right)
-    qc = new QueueController(sessionId, db, sbi)
-    qc.add(createFirstChange(vscode.window.activeTextEditor.document))
+    qc = new QueueController(context, sessionId, db, sbi)
+    qc.loadState()
+    // TODO: need to know state of mainQueue.loadedFirstChange
+    if () {
+      qc.add(createFirstChange(vscode.window.activeTextEditor.document))
+    }
     // change text content event handler
     // FIXME: event should be vscode.TextDocumentChangeEvent
     vscode.workspace.onDidChangeTextDocument((event: any) => {
@@ -192,7 +248,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // change active editor event handler
     vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
       // the active editor was changed; hide and deactivate the extension
-      deactivate(sbi)
+      deactivate(sbi, qc)
     })
     // the command associated with the extension
     let disposable = vscode.commands.registerCommand('extension.pusher', () => {
@@ -203,14 +259,19 @@ export async function activate(context: vscode.ExtensionContext) {
   } catch (err) {
     // something went wrong; deactivate the extension
     console.error(`[ERROR] Pusher.activate caused: ${err.message}`)
-    deactivate(sbi)
+    deactivate(sbi, qc)
   }
 }
 
 /**
  * This is called by vscode when the extension needs to be deactivated
  */
-export function deactivate(sbi) {
+export async function deactivate(
+  sbi: vscode.StatusBarItem,
+  qc: QueueController
+) {
+  qc.mergeQueues()
+  await qc.saveState()
   if (sbi) sbi.hide()
 }
 
