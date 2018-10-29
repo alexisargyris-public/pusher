@@ -50,7 +50,7 @@ export default class Database {
       return res.data.createSession.sessionId
     })
   }
-  public createFile(path: String) {
+  public createFile(path: string) {
     let bookId = 'amomonaima' // TODO: read the list of available bookIds
     // double escape backslash when writing paths
     let mutation = `
@@ -68,7 +68,7 @@ export default class Database {
       return res.data.createFile.fileId
     })
   }
-  public findFile(path: String) {
+  public findFile(path: string) {
     // find a file and return its id or false
     // quadruple escape backslash when reading paths
     const qr = `
@@ -86,8 +86,7 @@ export default class Database {
         : false
     })
   }
-  // TODO: deprecated
-  public createEvent(timestamp, sessionId: String, content: String) {
+  public createEvent(timestamp: string, sessionId: string, content: string) {
     let mutation = `
     mutation ce{
       createEvent(input: {
