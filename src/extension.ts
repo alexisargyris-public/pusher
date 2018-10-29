@@ -48,7 +48,8 @@ class FlashableQueue extends Queue {
   private db: Database
   private readonly storageKey: string = 'anmz'
   isFlashing: boolean = false
-  loadedFirstChange: boolean = false
+  hasLoadedFirstChange: boolean = false
+  private readonly firstChangeLabel: string = 'firstChange'
   constructor(cntxt: vscode.ExtensionContext, sessionId: string, db: Database) {
     super()
     this.context = cntxt
@@ -103,8 +104,10 @@ class FlashableQueue extends Queue {
     if (temp) {
       let temp2 = this.readContents(temp)
       this.addString(temp2)
-      let temp3 = JSON.parse(temp2)
-      if (temp3.content.firstChange) this.loadedFirstChange = true
+      // check if key 'firstChange' exists in the contents
+      if (temp2.indexOf(this.firstChangeLabel) >= 0) {
+        this.hasLoadedFirstChange = true
+      }
     }
   }
 }
@@ -166,6 +169,9 @@ class QueueController {
   loadState() {
     this.mainQueue.loadContents() // sync function
   }
+  hasLoadedFirstChange(): boolean {
+    return this.mainQueue.hasLoadedFirstChange
+  }
 }
 
 /**
@@ -217,7 +223,6 @@ export async function activate(context: vscode.ExtensionContext) {
   }
   function onTextChange(event: any, qc: QueueController) {
     // the text in the active editor was changed; store the change
-    deactivate(sbi, qc)
     if (event.contentChanges.length) {
       event.timestamp = makeTimestamp()
       qc.add(event)
@@ -236,8 +241,7 @@ export async function activate(context: vscode.ExtensionContext) {
     sbi = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right)
     qc = new QueueController(context, sessionId, db, sbi)
     qc.loadState()
-    // TODO: need to know state of mainQueue.loadedFirstChange
-    if () {
+    if (!qc.hasLoadedFirstChange()) {
       qc.add(createFirstChange(vscode.window.activeTextEditor.document))
     }
     // change text content event handler
@@ -256,9 +260,9 @@ export async function activate(context: vscode.ExtensionContext) {
     })
     context.subscriptions.push(disposable)
     console.log('pusher activated')
-  } catch (err) {
+  } catch (error) {
     // something went wrong; deactivate the extension
-    console.error(`[ERROR] Pusher.activate caused: ${err.message}`)
+    console.error(`[ERROR] Pusher.activate caused: ${error.message}`)
     deactivate(sbi, qc)
   }
 }
@@ -270,9 +274,14 @@ export async function deactivate(
   sbi: vscode.StatusBarItem,
   qc: QueueController
 ) {
-  qc.mergeQueues()
-  await qc.saveState()
-  if (sbi) sbi.hide()
+  try {
+    qc.mergeQueues()
+    await qc.saveState()
+    if (sbi) sbi.hide()
+  } catch(error) {
+    console.error(`[ERROR] Pusher.deactivate caused: ${error.message}`)
+    if (sbi) sbi.hide()
+  }
 }
 
 function makeTimestamp(): string {
