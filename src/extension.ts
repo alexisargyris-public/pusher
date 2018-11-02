@@ -4,14 +4,18 @@ import * as vscode from 'vscode'
 import Database from './db'
 import * as LZString from '../node_modules/lz-string'
 
+interface AnmzTextDocumentChangeEvent {
+  timestamp: string
+  contentChanges: vscode.TextDocumentContentChangeEvent
+}
 class Queue {
   protected readonly eventSeparator: string = '~'
   protected contents: string = ''
   protected eventsCounter: number = 0
-  private toString(event: any): string {
+  private toString(event: AnmzTextDocumentChangeEvent): string {
     return JSON.stringify({
       eventId: event.timestamp,
-      content: event.contentChanges[0]
+      content: event.contentChanges
     })
   }
   addString(newStr: string): void {
@@ -25,7 +29,7 @@ class Queue {
       ? newStr + this.eventSeparator + this.contents
       : newStr
   }
-  addEvent(editorEvent): void {
+  addEvent(editorEvent: AnmzTextDocumentChangeEvent): void {
     this.addString(this.toString(editorEvent))
   }
   emptyQueue(): void {
@@ -48,7 +52,6 @@ class FlashableQueue extends Queue {
   private db: Database
   private readonly storageKey: string = 'anmz'
   isFlashing: boolean = false
-  hasLoadedFirstChange: boolean = false
   private readonly firstChangeLabel: string = 'firstChange'
   constructor(cntxt: vscode.ExtensionContext, sessionId: string, db: Database) {
     super()
@@ -79,24 +82,40 @@ class FlashableQueue extends Queue {
     eventContent = eventContent.substring(1, eventContent.length - 1)
     return compress(eventContent)
   }
-  flash() {
+  async flash() {
     this.isFlashing = true
     let contentsToFlash = this.writeContents(this.contents)
-    return this.db
-      .createEvent(makeTimestamp(), this.sessionId, contentsToFlash)
-      .then(() => {
-        this.isFlashing = false
-        this.emptyQueue()
-      })
+    try {
+      await this.db.createEvent(makeTimestamp(), this.sessionId, contentsToFlash)
+      this.isFlashing = false
+      this.emptyQueue()
+    } catch(error) {
+      // something went wrong
+      let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
+      console.error(errorMsg)
+      vscode.window.showErrorMessage(errorMsg)
+      this.isFlashing = false
+      throw(error)
+    }
   }
-  saveContents() {
-    // check if there are any contents to save
-    return this.contents.length
-      ? this.context.workspaceState.update(
+  saveContents(): Promise<void> {
+    if (this.contents.length) {
+      return new Promise<void>(resolve => {
+        // first load any already existing data from storage
+        let temp = this.context.workspaceState.get(this.storageKey)
+        temp = this.readContents(temp)
+        // add current contents
+        temp += this.getContents() // TODO: is this good enough?
+        // save contents back to storage
+        this.writeContents(temp)
+        this.context.workspaceState.update(
           this.storageKey,
-          this.writeContents(this.contents)
-        )
-      : Promise.resolve()
+          this.writeContents(temp)
+        )        
+      })
+    } else {
+      return Promise.resolve()
+    }
   }
   loadContents() {
     let temp = this.context.workspaceState.get(this.storageKey)
@@ -104,10 +123,6 @@ class FlashableQueue extends Queue {
     if (temp) {
       let temp2 = this.readContents(temp)
       this.addString(temp2)
-      // check if key 'firstChange' exists in the contents
-      if (temp2.indexOf(this.firstChangeLabel) >= 0) {
-        this.hasLoadedFirstChange = true
-      }
     }
   }
 }
@@ -140,22 +155,19 @@ class QueueController {
       this.spareQueue.emptyQueue()
     }
   }
-  async add(editorEvent) {
+  async add(editorEvent: AnmzTextDocumentChangeEvent) {
     if (this.mainQueue.getContentsSize() > this.queueSizeLimit) {
-      // main queue is full, start flashing and meanwhile store events in spare queue
+      // main queue is full, store event in spare queue and start flashing (if not already started)
       this.spareQueue.addEvent(editorEvent)
-      try {
-        // check if the main queue is already being flashed
-        if (!this.mainQueue.isFlashing) {
+      // check if the main queue is already being flashed
+      if (!this.mainQueue.isFlashing) {
+        try {
           let fl = await this.mainQueue.flash()
-          this.mergeQueues()
+          this.mergeQueues() // move events from spare to main queue
+        } catch(error) {
+          // this error has already been caught in flash; the error handler here ensures that mergeQueues will _not_ run in case of error
+          // TODO: is this necessary?
         }
-      } catch (error) {
-        // something went wrong
-        let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
-        console.error(errorMsg)
-        vscode.window.showErrorMessage(errorMsg)
-        deactivate(this.sbi, this)
       }
     } else {
       // main queue still has space, store the event
@@ -163,14 +175,14 @@ class QueueController {
     }
     this.updateStatus()
   }
-  saveState() {
+  saveCurrentState() {
     return this.mainQueue.saveContents() // async function
   }
-  loadState() {
+  processPreviousState() {
     this.mainQueue.loadContents() // sync function
   }
-  hasLoadedFirstChange(): boolean {
-    return this.mainQueue.hasLoadedFirstChange
+  flash() {
+    this.mainQueue.flash()
   }
 }
 
@@ -179,27 +191,25 @@ class QueueController {
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
-  let fileId: any // Promise<String | Boolean>
-  let sessionId: any // Promise<String>
+  let fileId: String | Boolean
+  let sessionId: String
   let db: Database
   let qc: QueueController
   let sbi: vscode.StatusBarItem
+  const sbiCommandLabel = '_anmzDeactivate'
 
-  function createFirstChange(doc) {
+  function createFirstChange(doc: vscode.TextDocument): AnmzTextDocumentChangeEvent {
     return {
       timestamp: makeTimestamp(),
-      contentChanges: [
-        {
-          range: new vscode.Range(0, 0, 0, 0),
-          rangeLength: 0,
-          rangeOffset: 0,
-          text: doc.getText(),
-          firstChange: true
-        }
-      ]
+      contentChanges: {
+        range: new vscode.Range(0, 0, 0, 0),
+        rangeLength: 0,
+        // rangeOffset: 0,
+        text: doc.getText()
+      }
     }
   }
-  function findOrCreateFile(fn) {
+  function findOrCreateFile(fn): Promise<String | Boolean> {
     return new Promise(resolve => {
       return db.findFile(fn).then(id => {
         if (id) {
@@ -214,19 +224,19 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     })
   }
-  function createSession(fi) {
+  function createSession(fi): Promise<String> {
     return new Promise(resolve => {
       return db.createSession(fi).then(id => {
         resolve(id)
       })
     })
   }
-  function onTextChange(event: any, qc: QueueController) {
+  function onTextChange(event: vscode.TextDocumentContentChangeEvent, qc: QueueController) {
     // the text in the active editor was changed; store the change
-    if (event.contentChanges.length) {
-      event.timestamp = makeTimestamp()
-      qc.add(event)
-    }
+      qc.add({
+        timestamp: makeTimestamp(),
+        contentChanges: event
+      })
   }
 
   // if no document is open, exit immediately
@@ -238,16 +248,26 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.activeTextEditor.document.fileName
     )
     sessionId = await createSession(fileId)
+    // command used by status bar item
+    vscode.commands.registerTextEditorCommand(sbiCommandLabel, () => {
+      try {
+        qc.mergeQueues()
+        qc.flash()
+      } catch (error) {
+        let errorMsg = `[ERROR] Pusher.activate caused: ${error.message}`
+        console.error(errorMsg)
+        vscode.window.showErrorMessage(errorMsg)
+      }
+    })
+    // status bar item
     sbi = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right)
+    sbi.command = sbiCommandLabel
     qc = new QueueController(context, sessionId, db, sbi)
-    qc.loadState()
-    if (!qc.hasLoadedFirstChange()) {
-      qc.add(createFirstChange(vscode.window.activeTextEditor.document))
-    }
+    qc.processPreviousState()
+    qc.add(createFirstChange(vscode.window.activeTextEditor.document))
     // change text content event handler
-    // FIXME: event should be vscode.TextDocumentChangeEvent
-    vscode.workspace.onDidChangeTextDocument((event: any) => {
-      onTextChange(event, qc)
+    vscode.workspace.onDidChangeTextDocument((event: vscode.TextDocumentChangeEvent) => {
+      onTextChange(event.contentChanges[0], qc) // note: only the first change is processed
     })
     // change active editor event handler
     vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
@@ -276,10 +296,11 @@ export async function deactivate(
 ) {
   try {
     qc.mergeQueues()
-    await qc.saveState()
+    qc.flash()
     if (sbi) sbi.hide()
   } catch(error) {
     console.error(`[ERROR] Pusher.deactivate caused: ${error.message}`)
+    await qc.saveCurrentState()
     if (sbi) sbi.hide()
   }
 }
