@@ -86,16 +86,19 @@ class FlashableQueue extends Queue {
     this.isFlashing = true
     let contentsToFlash = this.writeContents(this.contents)
     try {
-      await this.db.createEvent(makeTimestamp(), this.sessionId, contentsToFlash)
-      this.isFlashing = false
+      await this.db.createEvent(
+        makeTimestamp(),
+        this.sessionId,
+        contentsToFlash
+      )
       this.emptyQueue()
-    } catch(error) {
+    } catch (error) {
       // something went wrong
       let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
       console.error(errorMsg)
       vscode.window.showErrorMessage(errorMsg)
+    } finally {
       this.isFlashing = false
-      throw(error)
     }
   }
   saveContents(): Promise<void> {
@@ -111,7 +114,7 @@ class FlashableQueue extends Queue {
         this.context.workspaceState.update(
           this.storageKey,
           this.writeContents(temp)
-        )        
+        )
       })
     } else {
       return Promise.resolve()
@@ -163,10 +166,8 @@ class QueueController {
       if (!this.mainQueue.isFlashing) {
         try {
           let fl = await this.mainQueue.flash()
-          this.mergeQueues() // move events from spare to main queue
-        } catch(error) {
-          // this error has already been caught in flash; the error handler here ensures that mergeQueues will _not_ run in case of error
-          // TODO: is this necessary?
+        } finally {
+          this.mergeQueues() // move any events from spare to main queue
         }
       }
     } else {
@@ -181,8 +182,9 @@ class QueueController {
   processPreviousState() {
     this.mainQueue.loadContents() // sync function
   }
-  flash() {
-    this.mainQueue.flash()
+  async flash() {
+    await this.mainQueue.flash()
+    this.updateStatus()
   }
 }
 
@@ -191,14 +193,16 @@ class QueueController {
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
-  let fileId: String | Boolean
-  let sessionId: String
+  let fileId: string | boolean
+  let sessionId: string
   let db: Database
   let qc: QueueController
   let sbi: vscode.StatusBarItem
   const sbiCommandLabel = '_anmzDeactivate'
 
-  function createFirstChange(doc: vscode.TextDocument): AnmzTextDocumentChangeEvent {
+  function createFirstChange(
+    doc: vscode.TextDocument
+  ): AnmzTextDocumentChangeEvent {
     return {
       timestamp: makeTimestamp(),
       contentChanges: {
@@ -209,7 +213,7 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
   }
-  function findOrCreateFile(fn): Promise<String | Boolean> {
+  function findOrCreateFile(fn): Promise<string | boolean> {
     return new Promise(resolve => {
       return db.findFile(fn).then(id => {
         if (id) {
@@ -224,19 +228,22 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     })
   }
-  function createSession(fi): Promise<String> {
+  function createSession(fi): Promise<string> {
     return new Promise(resolve => {
       return db.createSession(fi).then(id => {
         resolve(id)
       })
     })
   }
-  function onTextChange(event: vscode.TextDocumentContentChangeEvent, qc: QueueController) {
+  function onTextChange(
+    event: vscode.TextDocumentContentChangeEvent,
+    qc: QueueController
+  ) {
     // the text in the active editor was changed; store the change
-      qc.add({
-        timestamp: makeTimestamp(),
-        contentChanges: event
-      })
+    qc.add({
+      timestamp: makeTimestamp(),
+      contentChanges: event
+    })
   }
 
   // if no document is open, exit immediately
@@ -249,26 +256,29 @@ export async function activate(context: vscode.ExtensionContext) {
     )
     sessionId = await createSession(fileId)
     // command used by status bar item
-    vscode.commands.registerTextEditorCommand(sbiCommandLabel, () => {
+    vscode.commands.registerTextEditorCommand(sbiCommandLabel, async () => {
       try {
         qc.mergeQueues()
-        qc.flash()
+        await qc.flash()
       } catch (error) {
         let errorMsg = `[ERROR] Pusher.activate caused: ${error.message}`
         console.error(errorMsg)
         vscode.window.showErrorMessage(errorMsg)
+      } finally {
       }
     })
     // status bar item
     sbi = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right)
     sbi.command = sbiCommandLabel
     qc = new QueueController(context, sessionId, db, sbi)
-    qc.processPreviousState()
+    // qc.processPreviousState()
     qc.add(createFirstChange(vscode.window.activeTextEditor.document))
     // change text content event handler
-    vscode.workspace.onDidChangeTextDocument((event: vscode.TextDocumentChangeEvent) => {
-      onTextChange(event.contentChanges[0], qc) // note: only the first change is processed
-    })
+    vscode.workspace.onDidChangeTextDocument(
+      (event: vscode.TextDocumentChangeEvent) => {
+        onTextChange(event.contentChanges[0], qc) // note: only the first change is processed
+      }
+    )
     // change active editor event handler
     vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
       // the active editor was changed; hide and deactivate the extension
@@ -295,12 +305,12 @@ export async function deactivate(
   qc: QueueController
 ) {
   try {
-    qc.mergeQueues()
-    qc.flash()
-    if (sbi) sbi.hide()
-  } catch(error) {
+    // qc.mergeQueues()
+    // qc.flash()
+  } catch (error) {
     console.error(`[ERROR] Pusher.deactivate caused: ${error.message}`)
-    await qc.saveCurrentState()
+    // await qc.saveCurrentState()
+  } finally {
     if (sbi) sbi.hide()
   }
 }
