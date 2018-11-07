@@ -276,7 +276,10 @@ export async function activate(context: vscode.ExtensionContext) {
     // change text content event handler
     vscode.workspace.onDidChangeTextDocument(
       (event: vscode.TextDocumentChangeEvent) => {
-        onTextChange(event.contentChanges[0], qc) // note: only the first change is processed
+        // check if a content change exists
+        if (event.contentChanges.length) {
+          onTextChange(event.contentChanges[0], qc) // note: only the first change is processed
+        }
       }
     )
     // change active editor event handler
