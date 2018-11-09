@@ -83,24 +83,28 @@ class FlashableQueue extends Queue {
     return compress(eventContent)
   }
   async flash() {
-    this.isFlashing = true
-    let contentsToFlash = this.writeContents(this.contents)
-    try {
-      await this.db.createEvent(
-        makeTimestamp(),
-        this.sessionId,
-        contentsToFlash
-      )
-      this.emptyQueue()
-    } catch (error) {
-      // something went wrong
-      let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
-      console.error(errorMsg)
-      vscode.window.showErrorMessage(errorMsg)
-    } finally {
-      this.isFlashing = false
+    // check if there is any content to flash
+    if (this.contents.length) {
+      this.isFlashing = true
+      let contentsToFlash = this.writeContents(this.contents)
+      try {
+        await this.db.createEvent(
+          makeTimestamp(),
+          this.sessionId,
+          contentsToFlash
+        )
+        this.emptyQueue()
+      } catch (error) {
+        // something went wrong
+        let errorMsg = `[ERROR] Pusher.QueueController caused: ${error.message}`
+        console.error(errorMsg)
+        vscode.window.showErrorMessage(errorMsg)
+      } finally {
+        this.isFlashing = false
+      }
     }
   }
+  // not used
   saveContents(): Promise<void> {
     if (this.contents.length) {
       return new Promise<void>(resolve => {
@@ -120,6 +124,7 @@ class FlashableQueue extends Queue {
       return Promise.resolve()
     }
   }
+  // not used
   loadContents() {
     let temp = this.context.workspaceState.get(this.storageKey)
     // check if there are any contents to load
@@ -176,9 +181,11 @@ class QueueController {
     }
     this.updateStatus()
   }
+  // not used
   saveCurrentState() {
     return this.mainQueue.saveContents() // async function
   }
+  // not used
   processPreviousState() {
     this.mainQueue.loadContents() // sync function
   }
@@ -264,7 +271,6 @@ export async function activate(context: vscode.ExtensionContext) {
         let errorMsg = `[ERROR] Pusher.activate caused: ${error.message}`
         console.error(errorMsg)
         vscode.window.showErrorMessage(errorMsg)
-      } finally {
       }
     })
     // status bar item
@@ -308,11 +314,8 @@ export async function deactivate(
   qc: QueueController
 ) {
   try {
-    // qc.mergeQueues()
-    // qc.flash()
-  } catch (error) {
-    console.error(`[ERROR] Pusher.deactivate caused: ${error.message}`)
-    // await qc.saveCurrentState()
+    qc.mergeQueues()
+    await qc.flash()
   } finally {
     if (sbi) sbi.hide()
   }
