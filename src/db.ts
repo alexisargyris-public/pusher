@@ -8,6 +8,9 @@ export default class Database {
   constructor() {
     this.gr = new Mygraphql()
   }
+  /**
+   * @deprecated
+   */
   public batchCreateEvent(events: any[]) {
     let input: string = ''
     events.forEach(event => {
@@ -35,7 +38,12 @@ export default class Database {
       return res.data.batchCreateEvent // events array
     })
   }
-  public createSession(fileId: String) {
+  /**
+   * Create a session record
+   * @param {string} fileId The file's id
+   * @returns {Promise<string>} The session id
+   */
+  public createSessionAsync(fileId: String): Promise<string> {
     let mutation = `
     mutation {
       createSession(input: {
@@ -50,7 +58,12 @@ export default class Database {
       return res.data.createSession.sessionId
     })
   }
-  public createFile(path: string) {
+  /**
+   * Create a file record
+   * @param {string} path The file's path
+   * @returns {Promise<string>} The file id
+   */
+  public createFileAsync(path: string): Promise<string> {
     let bookId = 'amomonaima' // TODO: read the list of available bookIds
     // double escape backslash when writing paths
     let mutation = `
@@ -68,8 +81,12 @@ export default class Database {
       return res.data.createFile.fileId
     })
   }
-  public findFile(path: string) {
-    // find a file and return its id or false
+  /**
+   * Check if a particular file record exists
+   * @param {string} path The file's path
+   * @returns {Promise<string>} The file id or an empty string
+   */
+  public findFileAsync(path: string): Promise<string> {
     // quadruple escape backslash when reading paths
     const qr = `
     query lfbp{
@@ -83,10 +100,21 @@ export default class Database {
     return this.gr.query(qr).then(res => {
       return res.data.listFilesByPath.items.length
         ? res.data.listFilesByPath.items[0].fileId
-        : false
+        : ''
     })
   }
-  public createEvent(timestamp: string, sessionId: string, content: string) {
+  /**
+   * Create an event record
+   * @param {string} timestamp The time of the event
+   * @param {string} sessionId The session id
+   * @param {string} content The event's content
+   * @returns {Promise<string>} The new event id
+   */
+  public createEventAsync(
+    timestamp: string,
+    sessionId: string,
+    content: string
+  ): Promise<string> {
     let mutation = `
     mutation ce{
       createEvent(input: {

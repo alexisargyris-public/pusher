@@ -88,7 +88,7 @@ class FlashableQueue extends Queue {
       this.isFlashing = true
       let contentsToFlash = this.writeContents(this.contents)
       try {
-        await this.db.createEvent(
+        await this.db.createEventAsync(
           makeTimestamp(),
           this.sessionId,
           contentsToFlash
@@ -220,15 +220,15 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
   }
-  function findOrCreateFile(fn): Promise<string | boolean> {
+  function findOrCreateFile(fn): Promise<string> {
     return new Promise(resolve => {
-      return db.findFile(fn).then(id => {
-        if (id) {
+      return db.findFileAsync(fn).then(id => {
+        if (id.length) {
           // the file exists
           resolve(id)
         } else {
           // the file does not exist; create it
-          return db.createFile(fn).then(id => {
+          return db.createFileAsync(fn).then(id => {
             resolve(id)
           })
         }
@@ -237,7 +237,7 @@ export async function activate(context: vscode.ExtensionContext) {
   }
   function createSession(fi): Promise<string> {
     return new Promise(resolve => {
-      return db.createSession(fi).then(id => {
+      return db.createSessionAsync(fi).then(id => {
         resolve(id)
       })
     })

@@ -1,7 +1,6 @@
+.gitignore
 out
 node_modules
-.vscode-test/
-*.vsix
-aws-exports.ts
 npm-debug.log
-yarn.lock
+*.vsix
+/src/aws-exports.ts
