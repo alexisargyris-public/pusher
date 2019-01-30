@@ -1,6 +1,7 @@
 'use strict'
 
 import Config from './aws-exports'
+let isReadOnly: boolean = true
 
 /* 
   javascript client to appsync https://andrewgriffithsonline.com/blog/serverless-websockets-on-aws/#client-side-application-code 
@@ -72,7 +73,11 @@ export default class Mygraphql {
   }
 
   public mutate(mt: String) {
-    return this.client.mutate({ mutation: this.gql(mt) })
+    if (!isReadOnly) {
+      return this.client.mutate({ mutation: this.gql(mt) })
+    } else {
+      return Promise.resolve(undefined)
+    }
   }
   public query(qr: String) {
     return this.client.query({ query: this.gql(qr) })
