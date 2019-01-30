@@ -3,41 +3,13 @@
 import Mygraphql from './mygraphql'
 
 export default class Database {
-  public gr: any
+  private gr: any
+  private fakeResponse: number = 99999
 
   constructor() {
     this.gr = new Mygraphql()
   }
-  /**
-   * @deprecated
-   */
-  public batchCreateEvent(events: any[]) {
-    let input: string = ''
-    events.forEach(event => {
-      // eventContent is a large string and needs to be stringified
-      // double stringify to escape all double quotes...
-      let eventContent = JSON.stringify(JSON.stringify(event.content))
-      // remove outer double quotes
-      eventContent = eventContent.substring(1, eventContent.length - 1)
-      // the rest of the object should not be stringified
-      input += `,{
-        eventId: "${event.eventId}", 
-        sessionId: "${event.sessionId}", 
-        content: "${eventContent}"
-      }`
-    })
-    input = input.substring(1) // remove first comma
-    let mutation = `
-    mutation bce {
-      batchCreateEvent(input: [${input}]) {
-        eventId
-      }
-    }
-    `
-    return this.gr.mutate(mutation).then(res => {
-      return res.data.batchCreateEvent // events array
-    })
-  }
+  
   /**
    * Create a session record
    * @param {string} fileId The file's id
@@ -55,7 +27,7 @@ export default class Database {
     }
     `
     return this.gr.mutate(mutation).then(res => {
-      return res.data.createSession.sessionId
+      return res? res.data.createSession.sessionId : this.fakeResponse
     })
   }
   /**
@@ -78,7 +50,7 @@ export default class Database {
     }
     `
     return this.gr.mutate(mutation).then(res => {
-      return res.data.createFile.fileId
+      return res? res.data.createFile.fileId : this.fakeResponse
     })
   }
   /**
@@ -126,7 +98,38 @@ export default class Database {
       }
     }`
     return this.gr.mutate(mutation).then(res => {
-      return res.data.createEvent.eventId
+      return res? res.data.createEvent.eventId : this.fakeResponse
+    })
+  }
+
+  /**
+   * @deprecated
+   */
+  public batchCreateEvent(events: any[]) {
+    let input: string = ''
+    events.forEach(event => {
+      // eventContent is a large string and needs to be stringified
+      // double stringify to escape all double quotes...
+      let eventContent = JSON.stringify(JSON.stringify(event.content))
+      // remove outer double quotes
+      eventContent = eventContent.substring(1, eventContent.length - 1)
+      // the rest of the object should not be stringified
+      input += `,{
+        eventId: "${event.eventId}", 
+        sessionId: "${event.sessionId}", 
+        content: "${eventContent}"
+      }`
+    })
+    input = input.substring(1) // remove first comma
+    let mutation = `
+    mutation bce {
+      batchCreateEvent(input: [${input}]) {
+        eventId
+      }
+    }
+    `
+    return this.gr.mutate(mutation).then(res => {
+      return res.data.batchCreateEvent // events array
     })
   }
 }
