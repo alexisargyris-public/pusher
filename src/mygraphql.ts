@@ -1,7 +1,7 @@
 'use strict'
 
 import Config from './aws-exports'
-let isReadOnly: boolean = true
+let isReadOnly: boolean = false
 
 /* 
   javascript client to appsync https://andrewgriffithsonline.com/blog/serverless-websockets-on-aws/#client-side-application-code 
