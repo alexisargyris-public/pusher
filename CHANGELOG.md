@@ -10,7 +10,7 @@ All notable changes to the "pusher" extension will be documented in this file.
 
 ### Changed
 
-- code re-factoring for better maintenability
+- code re-factoring for better maintainability
 
 ## [1.3.0](https://github.com/anemomazomata/pusher/releases/tag/v1.3.0) (2018-10-29)
 
