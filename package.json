@@ -21,8 +21,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "extension.pusher",
-        "title": "pusher"
+        "command": "extension.pusherStart",
+        "title": "Pusher: start"
+      },
+      {
+        "command": "extension.pusherStop",
+        "title": "Pusher: stop"
       }
     ]
   },
