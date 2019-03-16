@@ -2,7 +2,13 @@
 
 All notable changes to the "pusher" extension will be documented in this file.
 
-## [1.4.0](https://github.com/anemomazomata/pusher/releases/tag/v1.3.0) (2019-01-02)
+## [1.5.0](https://github.com/anemomazomata/pusher/releases/tag/v1.5.0) (2019-01-02)
+
+### Added
+
+- start/stop extension
+
+## [1.4.0](https://github.com/anemomazomata/pusher/releases/tag/v1.4.0) (2019-01-02)
 
 ### Added
 
@@ -101,4 +107,3 @@ All notable changes to the "pusher" extension will be documented in this file.
 ### Added
 
 - proof of concept
- 

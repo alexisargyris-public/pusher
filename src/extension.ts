@@ -14,7 +14,7 @@ let sbi: vscode.StatusBarItem
 export function activate(context: vscode.ExtensionContext): void {
   const extensionName: string = 'extension.pusher'
   const sbiCommandId: string = '_anmzDeactivate'
-  const sbiTextWhileLoading: string = 'Pusher: loading...'
+  const sbiTextWhileLoading: string = 'Pusher: starting...'
   const sbiTooltip: string = 'Pusher sync'
   const sbiPriority: number = 10
 
@@ -52,7 +52,10 @@ export function activate(context: vscode.ExtensionContext): void {
   }
   async function start(): Promise<void> {
     // init status bar item
-    sbi = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, sbiPriority)
+    sbi = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      sbiPriority
+    )
     sbi.tooltip = sbiTooltip
     sbi.text = sbiTextWhileLoading
     sbi.command = sbiCommandId
@@ -75,24 +78,38 @@ export function activate(context: vscode.ExtensionContext): void {
   // if no document is open, exit immediately
   if (typeof vscode.window.activeTextEditor === 'undefined') return
   // extension activation command handler
-  context.subscriptions.push(vscode.commands.registerCommand(extensionName + 'Start', () => start()))
-  context.subscriptions.push(vscode.commands.registerCommand(extensionName + 'Stop', () => stop()))
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand(extensionName + 'Start', () =>
+      start()
+    )
+  )
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand(extensionName + 'Stop', () =>
+      stop()
+    )
+  )
   // status bar item click command handler
-  context.subscriptions.push(vscode.commands.registerTextEditorCommand(sbiCommandId, onSbiClick))
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand(sbiCommandId, onSbiClick)
+  )
   // change active editor event handler
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
-    // the active editor was changed; hide and deactivate the extension
-    deactivate()
-  }))
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((event: vscode.TextEditor) => {
+      // the active editor was changed; hide and deactivate the extension
+      deactivate()
+    })
+  )
   // change text content event handler
-  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
-    (event: vscode.TextDocumentChangeEvent) => {
-      // check if a content change exists
-      if (event.contentChanges.length) {
-        onTextChange(event.contentChanges[0], qc) // note: only the first change is processed
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument(
+      (event: vscode.TextDocumentChangeEvent) => {
+        // check if a content change exists
+        if (event.contentChanges.length) {
+          onTextChange(event.contentChanges[0], qc) // note: only the first change is processed
+        }
       }
-    }
-  ))
+    )
+  )
 }
 
 /**
@@ -100,9 +117,15 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export async function deactivate(): Promise<void> {
   try {
-    qc.mergeQueues()
-    await qc.flash()
+    if (qc) {
+      qc.mergeQueues()
+      await qc.flash()
+    }
   } finally {
-    if (sbi) sbi.hide()
+    qc = void 0
+    if (sbi) {
+      sbi.dispose()
+      sbi = void 0
+    }
   }
 }
