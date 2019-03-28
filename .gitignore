@@ -4,3 +4,4 @@ node_modules
 npm-debug.log
 *.vsix
 /src/aws-exports.ts
+/src/credentials.ts

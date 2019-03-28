@@ -2,7 +2,7 @@
   "name": "pusher",
   "displayName": "pusher",
   "description": "vscode extension to push update events of the active document to a remote server",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "publisher": "anemomazomata",
   "repository": {
     "type": "git",
@@ -15,19 +15,26 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:extension.pusherStart",
-    "onCommand:extension.pusherStop"
+    "*"
   ],
   "main": "./out/extension",
   "contributes": {
     "commands": [
       {
-        "command": "extension.pusherStart",
-        "title": "Pusher: start"
+        "command": "extension.pusherStartSyncing",
+        "title": "Pusher: start syncing"
       },
       {
-        "command": "extension.pusherStop",
-        "title": "Pusher: stop"
+        "command": "extension.pusherStopSyncing",
+        "title": "Pusher: stop syncing"
+      },
+      {
+        "command": "extension.pusherEncode",
+        "title": "Pusher: encode"
+      },
+      {
+        "command": "extension.pusherDecode",
+        "title": "Pusher: decode"
       }
     ]
   },

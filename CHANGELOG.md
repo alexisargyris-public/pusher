@@ -2,6 +2,12 @@
 
 All notable changes to the "pusher" extension will be documented in this file.
 
+## [1.6.0](https://github.com/anemomazomata/pusher/releases/tag/v1.6.0) (2019-03-28)
+
+### Added
+
+- encrypt / decrypt contents
+
 ## [1.5.0](https://github.com/anemomazomata/pusher/releases/tag/v1.5.0) (2019-01-02)
 
 ### Added
