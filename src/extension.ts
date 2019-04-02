@@ -50,8 +50,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     } finally {
       qc = void 0
-      sbiSub.dispose()
-      initSbi()
+      sbi.text = sbiOpts.defaultText
+      sbi.show()
     }
   }
   function onTextChange(event: vscode.TextDocumentChangeEvent): void {
