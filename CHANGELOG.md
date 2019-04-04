@@ -2,6 +2,12 @@
 
 All notable changes to the "pusher" extension will be documented in this file.
 
+## [1.7.0](https://github.com/anemomazomata/pusher/releases/tag/v1.7.0) (2019-04-04)
+
+### Added
+
+- webpack support (package extension)
+
 ## 1.6.1 (2019-04-02)
 
 ### Fixed

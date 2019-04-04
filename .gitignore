@@ -1,5 +1,5 @@
 .gitignore
-out
+dist
 node_modules
 npm-debug.log
 *.vsix
