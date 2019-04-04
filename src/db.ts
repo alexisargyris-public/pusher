@@ -1,6 +1,6 @@
 'use strict'
 
-import Mygraphql from './mygraphql'
+import { Mygraphql } from './mygraphql'
 
 export default class Database {
   private gr: any
@@ -9,7 +9,7 @@ export default class Database {
   constructor() {
     this.gr = new Mygraphql()
   }
-  
+
   /**
    * Create a session record
    * @param {string} fileId The file's id
@@ -27,7 +27,7 @@ export default class Database {
     }
     `
     return this.gr.mutate(mutation).then(res => {
-      return res? res.data.createSession.sessionId : this.fakeResponse
+      return res ? res.data.createSession.sessionId : this.fakeResponse
     })
   }
   /**
@@ -50,7 +50,7 @@ export default class Database {
     }
     `
     return this.gr.mutate(mutation).then(res => {
-      return res? res.data.createFile.fileId : this.fakeResponse
+      return res ? res.data.createFile.fileId : this.fakeResponse
     })
   }
   /**
@@ -98,7 +98,7 @@ export default class Database {
       }
     }`
     return this.gr.mutate(mutation).then(res => {
-      return res? res.data.createEvent.eventId : this.fakeResponse
+      return res ? res.data.createEvent.eventId : this.fakeResponse
     })
   }
 

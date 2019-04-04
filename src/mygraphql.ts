@@ -6,7 +6,7 @@ let isReadOnly: boolean = false
 /* 
   javascript client to appsync https://andrewgriffithsonline.com/blog/serverless-websockets-on-aws/#client-side-application-code 
 */
-export default class Mygraphql {
+export class Mygraphql {
   public gql: any
   public client: any
 
@@ -14,7 +14,7 @@ export default class Mygraphql {
     // environment setup
     const config = new Config()
     if (!global.WebSocket) {
-      global.WebSocket = require('ws')
+      global.WebSocket = require('../node_modules/ws')
     }
     if (!global.window) {
       global.window = {
