@@ -2,7 +2,7 @@
   "name": "pusher",
   "displayName": "pusher",
   "description": "vscode extension to push update events of the active document to a remote server",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "publisher": "anemomazomata",
   "repository": {
     "type": "git",

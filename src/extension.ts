@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const extensionName: string = 'extension.pusher'
   const sbiOpts: any = {
     commandId: 'extension.pusherSaveOnDemand',
-    defaultText: 'Pusher: not syncing',
+    defaultText: 'Pusher',
     tooltip: 'Pusher status',
     priority: 10
   }

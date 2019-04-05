@@ -2,6 +2,12 @@
 
 All notable changes to the "pusher" extension will be documented in this file.
 
+## [1.8.0](https://github.com/anemomazomata/pusher/releases/tag/v1.8.0) (2019-04-05)
+
+### Changed
+
+- less ui at the status bar
+
 ## [1.7.0](https://github.com/anemomazomata/pusher/releases/tag/v1.7.0) (2019-04-04)
 
 ### Added
