@@ -14,10 +14,7 @@ export class QueueController {
   private fileId: string | boolean
   private sessionId: string
 
-  constructor(
-    cntxt: vscode.ExtensionContext,
-    sbi: vscode.StatusBarItem
-  ) {
+  constructor(cntxt: vscode.ExtensionContext, sbi: vscode.StatusBarItem) {
     this.cntxt = cntxt
     this.sbi = sbi
   }
@@ -79,7 +76,11 @@ export class QueueController {
     }
   }
   private updateStatus() {
-    this.sbi.text = `Pusher: M ${this.mainQueue.getContentsSize()} / ${this.mainQueue.getEventsCounter()}, S ${this.spareQueue.getContentsSize()} / ${this.spareQueue.getEventsCounter()}`
+    this.sbi.text = `Pusher: ${this.mainQueue.getContentsSize()}/${this.mainQueue.getEventsCounter()}`
+    this.sbi.text +=
+      this.spareQueue.getContentsSize() > 0
+        ? `, ${this.spareQueue.getContentsSize()}/${this.spareQueue.getEventsCounter()}`
+        : ''
     this.sbi.show()
   }
   async flash() {
@@ -94,5 +95,4 @@ export class QueueController {
   processPreviousState() {
     this.mainQueue.loadContents() // sync function
   }
-
 }
