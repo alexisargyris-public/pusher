@@ -2,6 +2,12 @@
 
 All notable changes to the "pusher" extension will be documented in this file.
 
+## [1.8.1](https://github.com/anemomazomata/pusher/releases/tag/v1.8.1) (2019-05-06)
+
+### Fixed
+
+- fixed a dependency vulnerability
+
 ## [1.8.0](https://github.com/anemomazomata/pusher/releases/tag/v1.8.0) (2019-04-05)
 
 ### Changed
