@@ -1,6 +1,7 @@
 .gitignore
 dist
 node_modules
+out
 npm-debug.log
 *.vsix
 /src/aws-exports.ts
